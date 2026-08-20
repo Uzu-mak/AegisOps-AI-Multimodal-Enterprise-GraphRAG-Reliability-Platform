@@ -7,12 +7,20 @@ from sqlalchemy.orm import Session
 
 from app.api.exception_handlers import register_exception_handlers
 from app.api.routes.memories import router as memory_router
+from app.api.routes.search import router as search_router
+from app.api.routes.system import router as system_router
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 
 settings = get_settings()
-app = FastAPI(title="AegisOps")
+app = FastAPI(
+    title="AegisOps",
+    description="Operational Memory Engine — PostgreSQL + Qdrant + Neo4j + GraphRAG",
+    version="2.0.0",
+)
 app.include_router(memory_router)
+app.include_router(search_router)
+app.include_router(system_router)
 register_exception_handlers(app)
 
 

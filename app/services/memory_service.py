@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 from app.semantic.index import SemanticIndexError
+from app.graph.index import GraphProjectionError
 from app.services.exceptions import (
     InvalidLifecycleTransitionError,
     InvalidMemoryDataError,
@@ -102,10 +103,12 @@ class RealMemoryService:
         repository: SQLAlchemyMemoryRepository,
         session_factory,
         semantic_indexing_service: Optional[Any] = None,
+        graph_projection_service: Optional[Any] = None,
     ) -> None:
         self.repository = repository
         self.session_factory = session_factory
         self.semantic_indexing_service = semantic_indexing_service
+        self.graph_projection_service = graph_projection_service
 
     def _materialize_memory_for_return(self, session: Session, memory: MemoryRecord) -> MemoryRecord:
         session.refresh(memory)
@@ -134,6 +137,13 @@ class RealMemoryService:
                 self.semantic_indexing_service.index_memory(materialized)
             except SemanticIndexError as exc:
                 logger.warning(f"Semantic indexing failed for memory {materialized.id}: {exc}")
+
+        # ← Graph projection AFTER PostgreSQL commit (best-effort, non-fatal)
+        if self.graph_projection_service:
+            try:
+                self.graph_projection_service.project_memory(materialized)
+            except GraphProjectionError as exc:
+                logger.warning(f"Graph projection failed for memory {materialized.id}: {exc}")
 
         return materialized
 
@@ -230,6 +240,13 @@ class RealMemoryService:
             except SemanticIndexError as exc:
                 logger.warning(f"Semantic index update failed for memory {materialized.id}: {exc}")
 
+        # ← Graph projection AFTER PostgreSQL commit (best-effort, non-fatal)
+        if self.graph_projection_service:
+            try:
+                self.graph_projection_service.project_memory(materialized)
+            except GraphProjectionError as exc:
+                logger.warning(f"Graph projection update failed for memory {materialized.id}: {exc}")
+
         return materialized
 
     def archive_memory(self, memory_id: UUID) -> MemoryRecord:
@@ -240,6 +257,12 @@ class RealMemoryService:
                 self.semantic_indexing_service.archive_memory(memory_id)
             except SemanticIndexError as exc:
                 logger.warning(f"Semantic archive failed for memory {memory_id}: {exc}")
+        # Graph projection after PostgreSQL commit
+        if self.graph_projection_service:
+            try:
+                self.graph_projection_service.update_memory_status(memory)
+            except GraphProjectionError as exc:
+                logger.warning(f"Graph archive projection failed for memory {memory_id}: {exc}")
         return memory
 
     def dispute_memory(self, memory_id: UUID) -> MemoryRecord:
@@ -250,6 +273,12 @@ class RealMemoryService:
                 self.semantic_indexing_service.dispute_memory(memory_id)
             except SemanticIndexError as exc:
                 logger.warning(f"Semantic dispute failed for memory {memory_id}: {exc}")
+        # Graph projection after PostgreSQL commit
+        if self.graph_projection_service:
+            try:
+                self.graph_projection_service.update_memory_status(memory)
+            except GraphProjectionError as exc:
+                logger.warning(f"Graph dispute projection failed for memory {memory_id}: {exc}")
         return memory
 
     def supersede_memory(
@@ -286,6 +315,13 @@ class RealMemoryService:
                 self.semantic_indexing_service.supersede_memory(old_memory_id, new_materialized)
             except SemanticIndexError as exc:
                 logger.warning(f"Semantic supersede failed for memory {old_memory_id}: {exc}")
+
+        # ← Graph projection AFTER PostgreSQL commit (best-effort, non-fatal)
+        if self.graph_projection_service:
+            try:
+                self.graph_projection_service.project_supersession(old_materialized, new_materialized)
+            except GraphProjectionError as exc:
+                logger.warning(f"Graph supersede projection failed for memory {old_memory_id}: {exc}")
 
         return (old_materialized, new_materialized)
 

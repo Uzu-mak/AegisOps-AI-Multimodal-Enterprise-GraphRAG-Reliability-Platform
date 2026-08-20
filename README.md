@@ -23,6 +23,7 @@ PostgreSQL       Qdrant
 ```
 
 **Key principles:**
+
 - PostgreSQL is the single source of truth. Qdrant is a derived index.
 - PostgreSQL commits before any Qdrant operation is attempted.
 - Qdrant failures are non-fatal — logged and skipped; the memory is safe in PostgreSQL.
@@ -32,16 +33,16 @@ PostgreSQL       Qdrant
 
 ## Stack
 
-| Component | Version |
-|---|---|
-| Python | 3.12 |
-| FastAPI | 0.115 |
-| SQLAlchemy | 2.0 |
-| PostgreSQL | 16 |
-| Alembic | 1.13 |
-| Qdrant | latest (≥1.19) |
-| qdrant-client | 1.11 |
-| Pydantic | v2 |
+| Component     | Version        |
+| ------------- | -------------- |
+| Python        | 3.12           |
+| FastAPI       | 0.115          |
+| SQLAlchemy    | 2.0            |
+| PostgreSQL    | 16             |
+| Alembic       | 1.13           |
+| Qdrant        | latest (≥1.19) |
+| qdrant-client | 1.11           |
+| Pydantic      | v2             |
 
 ---
 
@@ -61,14 +62,14 @@ Every memory record has:
 
 ## Lifecycle Transitions
 
-| From | To | Allowed |
-|---|---|---|
-| `active` | `archived` | ✅ |
-| `active` | `disputed` | ✅ |
-| `active` | `superseded` | ✅ (via supersede endpoint) |
-| `disputed` | `active` | ✅ |
-| `disputed` | `archived` | ✅ |
-| any other | any | ❌ |
+| From       | To           | Allowed                     |
+| ---------- | ------------ | --------------------------- |
+| `active`   | `archived`   | ✅                          |
+| `active`   | `disputed`   | ✅                          |
+| `active`   | `superseded` | ✅ (via supersede endpoint) |
+| `disputed` | `active`     | ✅                          |
+| `disputed` | `archived`   | ✅                          |
+| any other  | any          | ❌                          |
 
 ---
 
@@ -92,6 +93,7 @@ docker compose up -d --build
 ```
 
 Services started:
+
 - `aegisops-api` → http://localhost:8000
 - `aegisops-postgres` → localhost:5432
 - `aegisops-qdrant` → http://localhost:6333
@@ -110,15 +112,15 @@ curl http://localhost:6333/dashboard   # Qdrant Web UI
 
 ## API Endpoints
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/v1/memories` | Create a memory |
-| `GET` | `/api/v1/memories` | List memories (filterable) |
-| `GET` | `/api/v1/memories/{id}` | Get a single memory |
-| `PATCH` | `/api/v1/memories/{id}` | Update fields |
-| `POST` | `/api/v1/memories/{id}/archive` | Archive |
-| `POST` | `/api/v1/memories/{id}/dispute` | Mark disputed |
-| `POST` | `/api/v1/memories/{id}/supersede` | Supersede with replacement |
+| Method  | Path                              | Description                |
+| ------- | --------------------------------- | -------------------------- |
+| `POST`  | `/api/v1/memories`                | Create a memory            |
+| `GET`   | `/api/v1/memories`                | List memories (filterable) |
+| `GET`   | `/api/v1/memories/{id}`           | Get a single memory        |
+| `PATCH` | `/api/v1/memories/{id}`           | Update fields              |
+| `POST`  | `/api/v1/memories/{id}/archive`   | Archive                    |
+| `POST`  | `/api/v1/memories/{id}/dispute`   | Mark disputed              |
+| `POST`  | `/api/v1/memories/{id}/supersede` | Supersede with replacement |
 
 Full schema available at http://localhost:8000/docs when running.
 
@@ -160,16 +162,16 @@ docker compose exec -T api python -m pytest tests/integration/ -v
 
 ### Test suites
 
-| Suite | Tests | What it covers |
-|---|---|---|
-| `tests/repositories/` | 5 | SQLAlchemy repository CRUD |
-| `tests/services/` | 8 | MemoryService lifecycle and transactions |
-| `tests/api/test_memory_api.py` | 11 | HTTP endpoints (Phase 1) |
-| `tests/api/test_semantic_api_integration.py` | 18 | Semantic indexing via API; Qdrant failure resilience |
-| `tests/semantic/test_fake_embedding.py` | 8 | Deterministic embedding mechanics |
-| `tests/semantic/test_qdrant_index.py` | 8 | Qdrant index operations (real Qdrant) |
-| `tests/semantic/test_eventual_consistency.py` | 9 | Qdrant failure isolation |
-| `tests/integration/test_qdrant_health.py` | 4 | Qdrant connectivity and collection setup |
+| Suite                                         | Tests | What it covers                                       |
+| --------------------------------------------- | ----- | ---------------------------------------------------- |
+| `tests/repositories/`                         | 5     | SQLAlchemy repository CRUD                           |
+| `tests/services/`                             | 8     | MemoryService lifecycle and transactions             |
+| `tests/api/test_memory_api.py`                | 11    | HTTP endpoints (Phase 1)                             |
+| `tests/api/test_semantic_api_integration.py`  | 18    | Semantic indexing via API; Qdrant failure resilience |
+| `tests/semantic/test_fake_embedding.py`       | 8     | Deterministic embedding mechanics                    |
+| `tests/semantic/test_qdrant_index.py`         | 8     | Qdrant index operations (real Qdrant)                |
+| `tests/semantic/test_eventual_consistency.py` | 9     | Qdrant failure isolation                             |
+| `tests/integration/test_qdrant_health.py`     | 4     | Qdrant connectivity and collection setup             |
 
 > ⚠️ Embedding tests use `DeterministicFakeEmbedding` (SHA-256 hash-based). Vectors are reproducible but are **not** semantically meaningful. Tests verify infrastructure mechanics, not vector quality.
 
@@ -232,15 +234,15 @@ docker compose exec api alembic current
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | — | Full PostgreSQL connection URL (required) |
-| `POSTGRES_DB` | — | Database name |
-| `POSTGRES_USER` | — | Database user |
-| `POSTGRES_PASSWORD` | — | Database password |
-| `POSTGRES_PORT` | `5432` | PostgreSQL port |
-| `QDRANT_URL` | `http://qdrant:6333` | Qdrant REST endpoint |
-| `QDRANT_COLLECTION_NAME` | `memories` | Qdrant collection name |
+| Variable                 | Default              | Description                               |
+| ------------------------ | -------------------- | ----------------------------------------- |
+| `DATABASE_URL`           | —                    | Full PostgreSQL connection URL (required) |
+| `POSTGRES_DB`            | —                    | Database name                             |
+| `POSTGRES_USER`          | —                    | Database user                             |
+| `POSTGRES_PASSWORD`      | —                    | Database password                         |
+| `POSTGRES_PORT`          | `5432`               | PostgreSQL port                           |
+| `QDRANT_URL`             | `http://qdrant:6333` | Qdrant REST endpoint                      |
+| `QDRANT_COLLECTION_NAME` | `memories`           | Qdrant collection name                    |
 
 > The Docker Compose `api` service constructs `DATABASE_URL` internally using `postgres` (the Compose service hostname), overriding any `localhost`-based value in `.env`. The `.env` file's `DATABASE_URL` is used when running directly on the host.
 
@@ -255,4 +257,3 @@ docker compose down
 # Stop and remove all data volumes
 docker compose down -v
 ```
-

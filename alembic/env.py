@@ -8,6 +8,7 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import get_settings
 from app.db.base import Base
 from app.db.models.memory import MemoryRecord
+from app.outbox.models import ProjectionOutboxEvent  # noqa: F401 — registers with Base
 
 settings = get_settings()
 config = context.config
