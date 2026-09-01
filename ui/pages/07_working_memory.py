@@ -1,19 +1,43 @@
 """Working Memory & Agent Trace page."""
 import streamlit as st
 from ui.api_client import api_post
+from ui.framework import (
+    capability_available,
+    fetch_runtime_health,
+    render_error_state,
+    render_health_cards,
+    render_loading,
+    render_page_header,
+    render_sidebar,
+    render_unavailable_state,
+)
+from ui.working_memory_payload import build_promotion_payload
 
 st.set_page_config(page_title="Working Memory — AegisOps", page_icon="🧩", layout="wide")
-st.title("🧩 Working Memory & Agent Trace")
-st.caption(
+render_sidebar()
+render_page_header(
+    "Working Memory",
     "Working memory is ephemeral context for the current session. "
-    "It is NOT automatically promoted to long-term PostgreSQL memory."
+    "It is NOT automatically promoted to long-term PostgreSQL memory.",
 )
+
+services = fetch_runtime_health()
+render_health_cards(
+    {k: services.get(k, {"status": "unknown"}) for k in ["api", "postgres", "llm"]}
+)
+
+available, reason = capability_available(services, ["api", "postgres"])
+if not available:
+    render_unavailable_state(reason)
+    st.stop()
 
 st.info(
     "**Architecture Note:** Working memory holds temporary observations, retrieved "
     "evidence, tool outputs, and hypotheses. Promotion to long-term memory is an "
     "explicit decision using a MemoryCandidate + PromotionPolicy."
 )
+
+st.warning("No autonomous agent runtime is implemented in this page; query actions call backend endpoints directly.")
 
 # Session-state backed working memory simulation
 if "working_memory" not in st.session_state:
@@ -22,7 +46,7 @@ if "agent_traces" not in st.session_state:
     st.session_state.agent_traces = []
 
 tab_wm, tab_agent, tab_promote = st.tabs(
-    ["Working Memory", "Agent Trace", "Promote to Long-term Memory"]
+    ["Working Memory", "Assisted Query Log", "Promote to Long-term Memory"]
 )
 
 with tab_wm:
@@ -64,15 +88,15 @@ with tab_wm:
         st.info("Working memory is empty. Add observations above.")
 
 with tab_agent:
-    st.subheader("Run Agent Workflow")
+    st.subheader("Run Assisted Query")
     task = st.text_input(
         "Task / Question",
         placeholder="Diagnose the root cause of elevated vibration on pump P-102",
     )
     anchor = st.text_input("Anchor Memory ID (optional)")
 
-    if st.button("Run Agent", type="primary") and task:
-        with st.spinner("Running agent workflow..."):
+    if st.button("Run Query", type="primary") and task:
+        with render_loading("Running backend query..."):
             result = api_post(
                 "/api/v1/graphrag/query",
                 {
@@ -91,12 +115,12 @@ with tab_agent:
                 "model": result.get("model_name", ""),
                 "is_synthetic": result.get("is_synthetic_response", True),
             })
-            st.success("Agent workflow complete.")
+            st.success("Query complete.")
 
     if st.session_state.agent_traces:
-        st.subheader("Recent Agent Traces")
+        st.subheader("Recent Query Logs")
         for trace in reversed(st.session_state.agent_traces[-5:]):
-            with st.expander(f"🤖 {trace['task'][:80]}"):
+            with st.expander(f"{trace['task'][:80]}"):
                 if trace["is_synthetic"]:
                     st.warning("⚠️ Synthetic response (test provider)")
                 st.markdown(trace["answer"])
@@ -138,17 +162,19 @@ with tab_promote:
                         if not title.strip():
                             st.error("Title required.")
                         else:
-                            result = api_post("/api/v1/memories", {
-                                "memory_type": mem_type,
-                                "title": title,
-                                "content": item["content"],
-                                "source_type": item.get("source") or "operator",
-                                "asset_id": asset_id or None,
-                                "confidence": item["confidence"],
-                                "importance": item["importance"],
-                                "metadata": {"promoted_from": "working_memory"},
-                            })
+                            result = api_post(
+                                "/api/v1/memories",
+                                build_promotion_payload(
+                                    memory_type=mem_type,
+                                    title=title,
+                                    content=item["content"],
+                                    source_type=item.get("source") or "operator",
+                                    asset_id=asset_id or None,
+                                    confidence=item["confidence"],
+                                    importance=item["importance"],
+                                ),
+                            )
                             if result and "id" in result:
                                 st.success(f"✅ Promoted to memory `{result['id']}`")
                             else:
-                                st.error("Promotion failed.")
+                                render_error_state("Promotion failed.")

@@ -341,7 +341,7 @@ class Neo4jGraphMemoryIndex(GraphMemoryIndex):
                 entity_result = session.run(
                     f"""
                     MATCH (start:Memory {{memory_id: $start_id}})
-                    MATCH (start)-[:{OWNED_REL_PATTERN}*1..{entity_path_len}]-(related:Memory)
+                    MATCH (start)-[:ABOUT_ASSET|ABOUT_COMPONENT|PART_OF_INCIDENT|OBSERVED_AT|BELONGS_TO_TEAM*1..{entity_path_len}]-(related:Memory)
                     WHERE related.memory_id <> $start_id
                     RETURN DISTINCT related.memory_id AS memory_id
                     ORDER BY memory_id
@@ -351,6 +351,21 @@ class Neo4jGraphMemoryIndex(GraphMemoryIndex):
                     limit=limit,
                 )
                 entity_ids = {row["memory_id"] for row in entity_result}
+
+                # Source links are only meaningful when a real source_id exists.
+                source_result = session.run(
+                    """
+                    MATCH (start:Memory {memory_id: $start_id})-[:SOURCED_FROM]->(src:Source)<-[:SOURCED_FROM]-(related:Memory)
+                    WHERE related.memory_id <> $start_id
+                      AND src.source_id IS NOT NULL
+                    RETURN DISTINCT related.memory_id AS memory_id
+                    ORDER BY memory_id
+                    LIMIT $limit
+                    """,
+                    start_id=start_id,
+                    limit=limit,
+                )
+                source_ids = {row["memory_id"] for row in source_result}
 
                 # --- Strategy 2: SUPERSEDES chain ---
                 supersedes_result = session.run(
@@ -367,7 +382,7 @@ class Neo4jGraphMemoryIndex(GraphMemoryIndex):
                 )
                 supersedes_ids = {row["memory_id"] for row in supersedes_result}
 
-            combined = entity_ids | supersedes_ids
+            combined = entity_ids | source_ids | supersedes_ids
             combined.discard(start_id)
             return sorted(UUID(uid) for uid in combined)[:limit]
 

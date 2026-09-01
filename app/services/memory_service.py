@@ -6,8 +6,10 @@ from typing import Any, Optional, Protocol
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
+from app.outbox.models import ProjectionOutboxEvent, ProjectionStatus, ProjectionType
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 from app.semantic.index import SemanticIndexError
 from app.graph.index import GraphProjectionError
@@ -122,12 +124,71 @@ class RealMemoryService:
     ) -> list[MemoryRecord]:
         return [self._materialize_memory_for_return(session, memory) for memory in memories]
 
+    def _enqueue_projection_events(
+        self,
+        *,
+        session: Session,
+        memory_id: UUID,
+        operation: str,
+    ) -> None:
+        """
+        Enqueue projection work inside the same PostgreSQL transaction.
+
+        Idempotency rule: if a non-terminal event (pending/processing/retrying)
+        already exists for the same memory + projection + operation, do not
+        create another event. If a terminal event exists, recycle it to pending.
+        """
+        target_projection_types: list[str] = [
+            ProjectionType.QDRANT.value,
+            ProjectionType.NEO4J.value,
+        ]
+
+        for projection_type in target_projection_types:
+            existing = session.scalar(
+                select(ProjectionOutboxEvent)
+                .where(
+                    ProjectionOutboxEvent.memory_id == memory_id,
+                    ProjectionOutboxEvent.projection_type == projection_type,
+                    ProjectionOutboxEvent.operation == operation,
+                )
+                .order_by(ProjectionOutboxEvent.created_at.desc())
+                .limit(1)
+            )
+
+            if existing is None:
+                session.add(
+                    ProjectionOutboxEvent(
+                        memory_id=memory_id,
+                        projection_type=projection_type,
+                        operation=operation,
+                        status=ProjectionStatus.PENDING.value,
+                    )
+                )
+                continue
+
+            if existing.status in {
+                ProjectionStatus.PENDING.value,
+                ProjectionStatus.PROCESSING.value,
+                ProjectionStatus.RETRYING.value,
+            }:
+                continue
+
+            existing.status = ProjectionStatus.PENDING.value
+            existing.retry_count = 0
+            existing.error_message = None
+            existing.completed_at = None
+
     def create_memory(self, *, data: MemoryCreateData) -> MemoryRecord:
         self._validate_create_data(data)
 
         with self.session_factory() as session:
             memory = self._build_memory_from_data(data)
             created = self.repository.create(session, memory)
+            self._enqueue_projection_events(
+                session=session,
+                memory_id=created.id,
+                operation="project",
+            )
             session.commit()  # ← PostgreSQL commit FIRST
             materialized = self._materialize_memory_for_return(session, created)
 
@@ -227,6 +288,11 @@ class RealMemoryService:
 
             self._validate_memory_record(memory)
             self.repository.update(session, memory)
+            self._enqueue_projection_events(
+                session=session,
+                memory_id=memory.id,
+                operation="project",
+            )
             session.commit()  # ← PostgreSQL commit FIRST
             materialized = self._materialize_memory_for_return(session, memory)
 
@@ -250,7 +316,11 @@ class RealMemoryService:
         return materialized
 
     def archive_memory(self, memory_id: UUID) -> MemoryRecord:
-        memory = self._transition_memory_status(memory_id, MemoryStatus.ARCHIVED.value)
+        memory = self._transition_memory_status(
+            memory_id,
+            MemoryStatus.ARCHIVED.value,
+            outbox_operation="status_update",
+        )
         # Semantic indexing after PostgreSQL commit
         if self.semantic_indexing_service:
             try:
@@ -266,7 +336,11 @@ class RealMemoryService:
         return memory
 
     def dispute_memory(self, memory_id: UUID) -> MemoryRecord:
-        memory = self._transition_memory_status(memory_id, MemoryStatus.DISPUTED.value)
+        memory = self._transition_memory_status(
+            memory_id,
+            MemoryStatus.DISPUTED.value,
+            outbox_operation="status_update",
+        )
         # Semantic indexing after PostgreSQL commit
         if self.semantic_indexing_service:
             try:
@@ -304,6 +378,16 @@ class RealMemoryService:
             existing.status = MemoryStatus.SUPERSEDED.value
             self.repository.create(session, replacement)
             self.repository.update(session, existing)
+            self._enqueue_projection_events(
+                session=session,
+                memory_id=existing.id,
+                operation="status_update",
+            )
+            self._enqueue_projection_events(
+                session=session,
+                memory_id=replacement.id,
+                operation="project",
+            )
             session.flush()
             session.commit()  # ← PostgreSQL commit FIRST
             old_materialized = self._materialize_memory_for_return(session, existing)
@@ -325,7 +409,13 @@ class RealMemoryService:
 
         return (old_materialized, new_materialized)
 
-    def _transition_memory_status(self, memory_id: UUID, target_status: str) -> MemoryRecord:
+    def _transition_memory_status(
+        self,
+        memory_id: UUID,
+        target_status: str,
+        *,
+        outbox_operation: str,
+    ) -> MemoryRecord:
         with self.session_factory() as session:
             memory = self.repository.get_for_update(session, memory_id)
             if memory is None:
@@ -344,6 +434,11 @@ class RealMemoryService:
 
             memory.status = target_status
             self.repository.update(session, memory)
+            self._enqueue_projection_events(
+                session=session,
+                memory_id=memory.id,
+                operation=outbox_operation,
+            )
             session.commit()
             return self._materialize_memory_for_return(session, memory)
 

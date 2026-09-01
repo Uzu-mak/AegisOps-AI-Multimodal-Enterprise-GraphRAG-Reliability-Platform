@@ -7,6 +7,8 @@ Navigation:
 """
 import streamlit as st
 
+from ui.framework import render_page_header, render_sidebar
+
 st.set_page_config(
     page_title="AegisOps",
     page_icon="⚙️",
@@ -14,32 +16,13 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── Sidebar branding ──────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## ⚙️ AegisOps")
-    st.caption("Industrial AI Reliability Platform")
-    st.divider()
-    st.markdown(
-        """
-**Navigation**
-
-Use the pages in the sidebar to explore:
-
-- **Overview** — System status & recent memories
-- **Memory Explorer** — Browse & inspect canonical records
-- **Semantic Search** — Vector similarity search
-- **Graph Explorer** — Relationship traversal
-- **Hybrid / GraphRAG** — Evidence-grounded answers
-- **Incident Triage** — Fault workflow
-- **Working Memory** — Ephemeral context & candidates
-- **Evaluation** — Benchmark metrics
-- **System Health** — Service & projection status
-        """
-    )
+render_sidebar()
 
 # ─── Home page ─────────────────────────────────────────────────────────────
-st.title("⚙️ AegisOps")
-st.subheader("Industrial AI Operational Memory Platform")
+render_page_header(
+    "AegisOps",
+    "Industrial AI Operational Memory Platform",
+)
 
 st.markdown(
     """

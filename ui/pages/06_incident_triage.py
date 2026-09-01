@@ -1,13 +1,36 @@
 """Incident / Fault Triage page."""
 import streamlit as st
 from ui.api_client import api_post, api_get
+from ui.framework import (
+    capability_available,
+    fetch_runtime_health,
+    render_error_state,
+    render_health_cards,
+    render_loading,
+    render_page_header,
+    render_sidebar,
+    render_unavailable_state,
+)
 
 st.set_page_config(page_title="Incident Triage — AegisOps", page_icon="🏭", layout="wide")
-st.title("🏭 Incident & Fault Triage")
-st.caption(
+render_sidebar()
+render_page_header(
+    "Incident & Fault Triage",
     "Create and link operational memory records for manufacturing fault analysis. "
-    "All entries become canonical PostgreSQL records."
+    "All entries become canonical PostgreSQL records.",
 )
+
+services = fetch_runtime_health()
+render_health_cards(
+    {k: services.get(k, {"status": "unknown"}) for k in ["api", "postgres", "qdrant", "neo4j"]}
+)
+
+available, reason = capability_available(services, ["api", "postgres"])
+if not available:
+    render_unavailable_state(reason)
+    st.stop()
+
+st.info("This page does not generate diagnoses. It only creates canonical records and retrieves evidence.")
 
 tab_create, tab_query = st.tabs(["Create Memory", "Query Incident"])
 
@@ -63,7 +86,7 @@ with tab_create:
                     with st.expander("Created Record"):
                         st.json(result)
                 else:
-                    st.error("Failed to create memory.")
+                    render_error_state("Failed to create memory.")
                     if result:
                         st.json(result)
 
@@ -74,7 +97,7 @@ with tab_query:
         placeholder="bearing failure vibration fault pump west facility",
     )
     if st.button("Find Related Memories", type="primary") and q:
-        with st.spinner("Searching..."):
+        with render_loading("Searching..."):
             result = api_post(
                 "/api/v1/search/hybrid",
                 {"query": q, "mode": "hybrid", "limit": 10},

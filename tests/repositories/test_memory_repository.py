@@ -7,6 +7,7 @@ from sqlalchemy import delete, select, text
 
 from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
 from app.db.session import SessionLocal
+from app.outbox.models import ProjectionOutboxEvent
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 
 
@@ -15,6 +16,7 @@ def session():
     with SessionLocal() as session:
         yield session
         session.rollback()
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
 

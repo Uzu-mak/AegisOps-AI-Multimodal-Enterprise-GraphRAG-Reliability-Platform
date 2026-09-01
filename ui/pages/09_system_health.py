@@ -1,9 +1,16 @@
 """System Health page."""
 import streamlit as st
 from ui.api_client import api_get
+from ui.framework import (
+    fetch_runtime_health,
+    render_health_cards,
+    render_page_header,
+    render_sidebar,
+)
 
 st.set_page_config(page_title="System Health — AegisOps", page_icon="🏥", layout="wide")
-st.title("🏥 System & Projection Health")
+render_sidebar()
+render_page_header("System & Projection Health")
 
 auto_refresh = st.toggle("Auto-refresh every 30s", value=False)
 if auto_refresh:
@@ -12,24 +19,22 @@ if auto_refresh:
     st.rerun()
 
 # Services
-health = api_get("/api/v1/system/health") or {}
-services = health.get("services", {})
+services = fetch_runtime_health()
 
 st.subheader("Service Status")
-cols = st.columns(4)
-icons = {"healthy": "✅", "degraded": "⚠️", "unhealthy": "❌", "unavailable": "🔴"}
+render_health_cards(
+    {k: services.get(k, {"status": "unknown"}) for k in ["api", "postgres", "qdrant", "neo4j", "llm"]}
+)
 
-for i, (name, info) in enumerate(services.items()):
-    if isinstance(info, dict):
-        s = info.get("status", "unknown")
-        icon = icons.get(s, "⬜")
-        with cols[i % 4]:
-            st.metric(
-                label=f"{icon} {name.upper()}",
-                value=s,
-            )
-            if s != "healthy":
-                st.error(info.get("error", "unavailable"))
+postgres_status = str(services.get("postgres", {}).get("status", "unknown"))
+if postgres_status not in {"healthy", "degraded"}:
+    st.error("Canonical PostgreSQL store is unavailable. CRUD operations may fail.")
+
+if str(services.get("qdrant", {}).get("status", "unknown")) not in {"healthy", "degraded"}:
+    st.warning("Qdrant projection is unavailable. Semantic capabilities are degraded/unavailable.")
+
+if str(services.get("neo4j", {}).get("status", "unknown")) not in {"healthy", "degraded"}:
+    st.warning("Neo4j projection is unavailable. Graph capabilities are degraded/unavailable.")
 
 st.divider()
 

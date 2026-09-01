@@ -1,17 +1,43 @@
 """Evaluation Dashboard page."""
 import streamlit as st
 import pandas as pd
-
-st.set_page_config(page_title="Evaluation — AegisOps", page_icon="📈", layout="wide")
-st.title("📈 Evaluation Dashboard")
-st.caption(
-    "Benchmark retrieval and GraphRAG quality. "
-    "Only metrics from actual runs are reported — no fabricated numbers."
+from ui.framework import (
+    capability_available,
+    fetch_runtime_health,
+    render_health_cards,
+    render_page_header,
+    render_sidebar,
+    render_unavailable_state,
 )
 
+st.set_page_config(page_title="Evaluation — AegisOps", page_icon="📈", layout="wide")
+render_sidebar()
+render_page_header(
+    "Evaluation Dashboard",
+    "Benchmark retrieval and GraphRAG quality. "
+    "Only metrics from actual runs are reported — no fabricated numbers.",
+)
+
+services = fetch_runtime_health()
+render_health_cards({k: services.get(k, {"status": "unknown"}) for k in ["api", "postgres", "qdrant", "neo4j"]})
+
+available, reason = capability_available(services, ["api"])
+if not available:
+    render_unavailable_state(reason)
+    st.stop()
+
 st.info(
-    "The evaluation framework supports Recall@K, MRR, groundedness, and citation "
-    "accuracy across semantic, graph, hybrid, and agentic retrieval modes. "
+    "Currently measurable metrics in this UI are retrieval-focused: Recall@K, MRR, and task success. "
+    "Agent tool-selection evaluation is intentionally not implemented in Slice 1."
+)
+
+st.warning(
+    "Unavailable in Slice 1: event publication latency, projection latency, DLQ metrics, "
+    "outbox publication lag, and Kafka consumer lag dashboards."
+)
+
+st.caption(
+    "Failure taxonomy labels are available for manual analysis. "
     "Configure benchmark cases in your evaluation scripts and results appear here."
 )
 

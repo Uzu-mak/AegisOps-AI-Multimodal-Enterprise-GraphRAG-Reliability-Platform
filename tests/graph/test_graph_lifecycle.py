@@ -97,7 +97,8 @@ class TestSupersession:
                 new_id=str(new.id),
                 old_id=str(old.id),
             )
-        assert result.single()["n"] == 1
+            record = result.single()
+        assert record["n"] == 1
 
     def test_old_memory_node_retained_after_supersession(
         self, graph_index: Neo4jGraphMemoryIndex, request
@@ -145,7 +146,8 @@ class TestSupersession:
                 new_id=str(new.id),
                 old_id=str(old.id),
             )
-        assert result.single()["n"] == 1
+            record = result.single()
+        assert record["n"] == 1
 
     def test_superseded_status_updated_on_old_node(
         self, graph_index: Neo4jGraphMemoryIndex, request

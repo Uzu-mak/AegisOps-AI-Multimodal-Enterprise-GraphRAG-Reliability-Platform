@@ -9,15 +9,18 @@ from sqlalchemy import delete
 from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
 from app.db.session import SessionLocal
 from app.main import app
+from app.outbox.models import ProjectionOutboxEvent
 
 
 @pytest.fixture(autouse=True)
 def clean_memories():
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
     yield
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
 

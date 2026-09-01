@@ -1,17 +1,43 @@
 """Hybrid / GraphRAG page."""
 import streamlit as st
 from ui.api_client import api_post
+from ui.framework import (
+    capability_available,
+    fetch_runtime_health,
+    render_error_state,
+    render_health_cards,
+    render_loading,
+    render_page_header,
+    render_sidebar,
+    render_unavailable_state,
+)
 
 st.set_page_config(page_title="Hybrid / GraphRAG — AegisOps", page_icon="🧠", layout="wide")
-st.title("🧠 Hybrid Retrieval & GraphRAG")
-st.caption(
+render_sidebar()
+render_page_header(
+    "Hybrid Retrieval & GraphRAG",
     "Evidence-grounded answers combining semantic search, graph traversal, "
-    "and LLM synthesis over canonical PostgreSQL memories."
+    "and optional generation over canonical PostgreSQL memories.",
+)
+
+services = fetch_runtime_health()
+render_health_cards(
+    {k: services.get(k, {"status": "unknown"}) for k in ["api", "postgres", "qdrant", "neo4j", "llm"]}
 )
 
 tab_rag, tab_hybrid = st.tabs(["GraphRAG Query", "Hybrid Retrieval"])
 
 with tab_rag:
+    st.info(
+        "GraphRAG responses are generated from retrieved evidence. "
+        "When test provider mode is active, generated text is deterministic and non-production."
+    )
+
+    rag_available, rag_reason = capability_available(services, ["api"])
+    if not rag_available:
+        render_unavailable_state(rag_reason)
+        st.stop()
+
     question = st.text_area(
         "Operational question",
         placeholder="What failures have been observed on pump P-102 at the west facility?",
@@ -22,7 +48,7 @@ with tab_rag:
     ctx_limit = col2.slider("Evidence context limit", 1, 10, 5)
 
     if st.button("Ask AegisOps", type="primary") and question:
-        with st.spinner("Retrieving evidence and generating answer..."):
+        with render_loading("Retrieving evidence and generating answer..."):
             result = api_post(
                 "/api/v1/graphrag/query",
                 {
@@ -64,18 +90,23 @@ with tab_rag:
                     st.markdown(e.get("content_preview", ""))
                     st.caption(f"Memory ID: `{e.get('memory_id', '')}`")
         else:
-            st.error("GraphRAG query failed.")
+            render_error_state("GraphRAG query failed.")
             if result:
                 st.json(result)
 
 with tab_hybrid:
+    hybrid_available, hybrid_reason = capability_available(services, ["api"])
+    if not hybrid_available:
+        render_unavailable_state(hybrid_reason)
+        st.stop()
+
     hybrid_query = st.text_input("Search query", placeholder="bearing wear fault")
     mode = st.radio("Retrieval mode", ["hybrid", "semantic", "graph"], horizontal=True)
     hlimit = st.slider("Max results", 1, 20, 10)
     hops = st.slider("Graph hops (hybrid/graph mode)", 1, 5, 2)
 
     if st.button("Retrieve", type="primary") and hybrid_query:
-        with st.spinner("Retrieving..."):
+        with render_loading("Retrieving..."):
             result = api_post(
                 "/api/v1/search/hybrid",
                 {
@@ -89,6 +120,8 @@ with tab_hybrid:
         if result and "error" not in result:
             results = result.get("results", [])
             st.success(f"{len(results)} results via {mode} retrieval")
+            if isinstance(result.get("latency_ms"), (int, float)):
+                st.metric("Retrieval Latency", f"{result['latency_ms']:.1f}ms")
 
             for r in results:
                 src = r.get("retrieval_source", "")
@@ -102,4 +135,7 @@ with tab_hybrid:
                     c3.write(f"**Asset:** {r.get('asset_id') or '—'}")
                     st.caption(r.get("content_preview", ""))
         else:
-            st.error("Retrieval failed.")
+            if isinstance(result, dict) and result.get("detail"):
+                render_error_state(str(result.get("detail")))
+            else:
+                render_error_state("Retrieval failed.")

@@ -167,7 +167,8 @@ class TestOptionalRelationships:
                 "MATCH (m:Memory {memory_id: $id})-[:ABOUT_ASSET]->() RETURN count(*) AS n",
                 id=str(memory.id),
             )
-        assert result.single()["n"] == 0
+            record = result.single()
+        assert record["n"] == 0
 
     def test_no_incident_node_when_incident_id_is_none(
         self, graph_index: Neo4jGraphMemoryIndex, neo4j_driver, request
@@ -182,7 +183,8 @@ class TestOptionalRelationships:
                 "MATCH (m:Memory {memory_id: $id})-[:PART_OF_INCIDENT]->() RETURN count(*) AS n",
                 id=str(memory.id),
             )
-        assert result.single()["n"] == 0
+            record = result.single()
+        assert record["n"] == 0
 
 
 class TestIdempotency:
@@ -201,7 +203,8 @@ class TestIdempotency:
                 "MATCH (m:Memory {memory_id: $id}) RETURN count(m) AS n",
                 id=str(memory.id),
             )
-        assert result.single()["n"] == 1
+            record = result.single()
+        assert record["n"] == 1
 
     def test_double_projection_creates_one_relationship(
         self, graph_index: Neo4jGraphMemoryIndex, neo4j_driver, request
@@ -217,7 +220,8 @@ class TestIdempotency:
                 "MATCH (m:Memory {memory_id: $id})-[r:ABOUT_ASSET]->() RETURN count(r) AS n",
                 id=str(memory.id),
             )
-        assert result.single()["n"] == 1
+            record = result.single()
+        assert record["n"] == 1
 
 
 class TestUpdateReconciliation:

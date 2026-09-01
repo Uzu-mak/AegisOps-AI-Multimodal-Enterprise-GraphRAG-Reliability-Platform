@@ -20,6 +20,7 @@ from app.api.deps import get_memory_service
 from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
 from app.db.session import SessionLocal
 from app.main import app
+from app.outbox.models import ProjectionOutboxEvent
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 from app.services.memory_service import RealMemoryService
 from app.services.semantic_service import SemanticIndexingService
@@ -49,10 +50,12 @@ def _base_payload(**overrides) -> dict:
 @pytest.fixture(autouse=True)
 def clean_memories():
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
     yield
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
 

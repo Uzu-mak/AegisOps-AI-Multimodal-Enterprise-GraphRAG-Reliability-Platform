@@ -12,8 +12,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_memory_service, get_settings
-from app.core.config import Settings
+from app.api.deps import (
+    get_graph_memory_index,
+    get_hybrid_retriever,
+    get_llm_provider,
+    get_semantic_index,
+)
+from app.graph.neo4j_impl import Neo4jGraphMemoryIndex
+from app.graphrag.pipeline import GraphRAGPipeline
+from app.graphrag.provider import LLMProvider
+from app.retrieval.hybrid import HybridMemoryRetriever
+from app.semantic.qdrant_impl import QdrantSemanticIndex
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
 
@@ -66,6 +75,7 @@ class HybridRetrieveResponse(BaseModel):
     results: list[RetrievalResultOut]
     total: int
     mode: str
+    latency_ms: Optional[float] = None
 
 
 class GraphRelatedResponse(BaseModel):
@@ -88,65 +98,26 @@ class GraphRAGResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Dependencies for retriever/pipeline (constructed lazily)
-# ---------------------------------------------------------------------------
-
-def _get_hybrid_retriever():
-    """Build HybridMemoryRetriever from current app state."""
-    from app.api.deps import (
-        get_embedding_provider,
-        get_graph_memory_index,
-        get_semantic_index,
-        get_settings,
-    )
-    from app.db.session import SessionLocal
-    from app.retrieval.hybrid import HybridMemoryRetriever
-
-    settings = get_settings()
-    embedding_provider = get_embedding_provider()
-    semantic_index = get_semantic_index(
-        embedding_provider=embedding_provider, settings=settings
-    )
-    graph_index = get_graph_memory_index(settings=settings)
-    return HybridMemoryRetriever(
-        semantic_index=semantic_index,
-        graph_index=graph_index,
-        embedding_provider=embedding_provider,
-        session_factory=SessionLocal,
-    )
-
-
-def _get_graphrag_pipeline(context_limit: int = 5):
-    from app.core.config import get_settings
-    from app.graphrag.pipeline import GraphRAGPipeline
-    from app.graphrag.providers import DeterministicTestProvider, OpenAIProvider
-
-    settings = get_settings()
-    if settings.LLM_PROVIDER == "openai" and settings.OPENAI_API_KEY:
-        llm = OpenAIProvider(
-            api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL
-        )
-    else:
-        llm = DeterministicTestProvider()
-
-    retriever = _get_hybrid_retriever()
-    return GraphRAGPipeline(
-        retriever=retriever,
-        llm_provider=llm,
-        context_limit=context_limit,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
 @router.post("/search/semantic", response_model=HybridRetrieveResponse)
-def semantic_search(request: SemanticSearchRequest) -> HybridRetrieveResponse:
+def semantic_search(
+    request: SemanticSearchRequest,
+    retriever: HybridMemoryRetriever = Depends(get_hybrid_retriever),
+    semantic_index: Optional[QdrantSemanticIndex] = Depends(get_semantic_index),
+) -> HybridRetrieveResponse:
     """Semantic vector search via Qdrant, hydrated from PostgreSQL."""
+    import time
     from app.retrieval.models import RetrievalQuery
 
-    retriever = _get_hybrid_retriever()
+    if semantic_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Semantic search is unavailable because Qdrant is unavailable",
+        )
+
+    t0 = time.monotonic()
     query = RetrievalQuery(
         text=request.query,
         mode="semantic",
@@ -157,16 +128,38 @@ def semantic_search(request: SemanticSearchRequest) -> HybridRetrieveResponse:
         results=_format_results(results),
         total=len(results),
         mode="semantic",
+        latency_ms=(time.monotonic() - t0) * 1000,
     )
 
 
 @router.post("/search/hybrid", response_model=HybridRetrieveResponse)
-def hybrid_retrieve(request: HybridRetrieveRequest) -> HybridRetrieveResponse:
+def hybrid_retrieve(
+    request: HybridRetrieveRequest,
+    retriever: HybridMemoryRetriever = Depends(get_hybrid_retriever),
+    semantic_index: Optional[QdrantSemanticIndex] = Depends(get_semantic_index),
+    graph_index: Optional[Neo4jGraphMemoryIndex] = Depends(get_graph_memory_index),
+) -> HybridRetrieveResponse:
     """Hybrid retrieval: Qdrant semantic + Neo4j graph, hydrated from PostgreSQL."""
+    import time
     from uuid import UUID as PUUID
     from app.retrieval.models import RetrievalQuery
 
-    retriever = _get_hybrid_retriever()
+    if request.mode == "semantic" and semantic_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Semantic retrieval mode is unavailable because Qdrant is unavailable",
+        )
+    if request.mode == "graph" and graph_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Graph retrieval mode is unavailable because Neo4j is unavailable",
+        )
+    if request.mode == "hybrid" and semantic_index is None and graph_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Hybrid retrieval is unavailable because both Qdrant and Neo4j are unavailable",
+        )
+
     anchor_id = None
     if request.anchor_memory_id:
         try:
@@ -177,6 +170,7 @@ def hybrid_retrieve(request: HybridRetrieveRequest) -> HybridRetrieveResponse:
                 detail="Invalid anchor_memory_id UUID format",
             )
 
+    t0 = time.monotonic()
     query = RetrievalQuery(
         text=request.query,
         mode=request.mode,
@@ -189,17 +183,18 @@ def hybrid_retrieve(request: HybridRetrieveRequest) -> HybridRetrieveResponse:
         results=_format_results(results),
         total=len(results),
         mode=request.mode,
+        latency_ms=(time.monotonic() - t0) * 1000,
     )
 
 
 @router.post("/search/graph-related", response_model=GraphRelatedResponse)
-def graph_related_memories(request: GraphRelatedRequest) -> GraphRelatedResponse:
+def graph_related_memories(
+    request: GraphRelatedRequest,
+    graph_index: Optional[Neo4jGraphMemoryIndex] = Depends(get_graph_memory_index),
+) -> GraphRelatedResponse:
     """Return memory UUIDs structurally related in Neo4j."""
     from uuid import UUID as PUUID
-    from app.api.deps import get_graph_memory_index, get_settings
 
-    settings = get_settings()
-    graph_index = get_graph_memory_index(settings=settings)
     if graph_index is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -225,9 +220,17 @@ def graph_related_memories(request: GraphRelatedRequest) -> GraphRelatedResponse
 
 
 @router.post("/graphrag/query", response_model=GraphRAGResponse)
-def graphrag_query(request: GraphRAGRequest) -> GraphRAGResponse:
+def graphrag_query(
+    request: GraphRAGRequest,
+    retriever: HybridMemoryRetriever = Depends(get_hybrid_retriever),
+    llm_provider: LLMProvider = Depends(get_llm_provider),
+) -> GraphRAGResponse:
     """Evidence-grounded answer generation using hybrid retrieval + LLM."""
-    pipeline = _get_graphrag_pipeline(context_limit=request.context_limit)
+    pipeline = GraphRAGPipeline(
+        retriever=retriever,
+        llm_provider=llm_provider,
+        context_limit=request.context_limit,
+    )
     resp = pipeline.query(
         question=request.question,
         anchor_memory_id=request.anchor_memory_id,

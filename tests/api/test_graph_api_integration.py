@@ -19,6 +19,7 @@ from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
 from app.db.session import SessionLocal
 from app.graph.index import GraphProjectionError
 from app.main import app
+from app.outbox.models import ProjectionOutboxEvent
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 from app.services.graph_service import GraphProjectionService
 from app.services.memory_service import RealMemoryService
@@ -63,10 +64,12 @@ def _replacement_payload() -> dict:
 @pytest.fixture(autouse=True)
 def clean_memories():
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
     yield
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
 

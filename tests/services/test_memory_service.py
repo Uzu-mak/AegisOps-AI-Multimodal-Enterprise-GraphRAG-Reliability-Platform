@@ -3,10 +3,11 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
 from app.db.session import SessionLocal
+from app.outbox.models import ProjectionOutboxEvent
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 from app.services.exceptions import (
     InvalidLifecycleTransitionError,
@@ -19,10 +20,12 @@ from app.services.memory_service import MemoryCreateData, MemoryService
 @pytest.fixture(autouse=True)
 def clean_memories():
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
     yield
     with SessionLocal() as session:
+        session.execute(delete(ProjectionOutboxEvent))
         session.execute(delete(MemoryRecord))
         session.commit()
 
@@ -139,3 +142,30 @@ def test_archive_rejects_invalid_transition(service):
 
     with pytest.raises(InvalidLifecycleTransitionError):
         service.archive_memory(original.id)
+
+
+def test_create_memory_enqueues_projection_outbox_events(service):
+    record = service.create_memory(data=make_data(title="Outbox enqueue"))
+
+    with SessionLocal() as session:
+        rows = session.scalars(
+            select(ProjectionOutboxEvent).where(ProjectionOutboxEvent.memory_id == record.id)
+        ).all()
+
+    assert len(rows) == 2
+    assert {row.projection_type for row in rows} == {"qdrant", "neo4j"}
+    assert {row.operation for row in rows} == {"project"}
+
+
+def test_projection_enqueue_is_idempotent_while_pending(service):
+    record = service.create_memory(data=make_data(title="Idempotent outbox"))
+
+    service.update_memory(record.id, {"title": "Idempotent outbox v2"})
+
+    with SessionLocal() as session:
+        rows = session.scalars(
+            select(ProjectionOutboxEvent).where(ProjectionOutboxEvent.memory_id == record.id)
+        ).all()
+
+    assert len(rows) == 2
+    assert {row.projection_type for row in rows} == {"qdrant", "neo4j"}
