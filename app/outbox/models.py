@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum as SQLEnum, Integer, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -33,6 +33,11 @@ class ProjectionType(str, Enum):
     NEO4J = "neo4j"
 
 
+class KafkaPublishStatus(str, Enum):
+    PENDING = "pending"
+    PUBLISHED = "published"
+
+
 class ProjectionOutboxEvent(Base):
     """
     Outbox event tracking a required projection for a memory record.
@@ -47,12 +52,26 @@ class ProjectionOutboxEvent(Base):
     memory_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
     projection_type: Mapped[str] = mapped_column(String(20), nullable=False)
     operation: Mapped[str] = mapped_column(String(30), nullable=False, default="project")
+    event_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, default=uuid4, index=True)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    memory_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default=ProjectionStatus.PENDING.value, index=True
     )
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_retries: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    kafka_publish_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=KafkaPublishStatus.PENDING.value, index=True
+    )
+    kafka_retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    kafka_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -65,5 +84,8 @@ class ProjectionOutboxEvent(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
     completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    kafka_published_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

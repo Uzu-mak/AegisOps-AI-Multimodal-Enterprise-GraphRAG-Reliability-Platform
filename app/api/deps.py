@@ -14,7 +14,7 @@ from app.embeddings.provider import EmbeddingProvider
 from app.graph.index import GraphProjectionError
 from app.graph.neo4j_impl import Neo4jGraphMemoryIndex
 from app.graphrag.provider import LLMProvider
-from app.graphrag.providers import DeterministicTestProvider, OpenAIProvider
+from app.graphrag.providers import create_llm_provider
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 from app.retrieval.hybrid import HybridMemoryRetriever
 from app.semantic.index import SemanticIndexError
@@ -188,10 +188,5 @@ def get_hybrid_retriever(
 def get_llm_provider(
     settings: Settings = Depends(get_settings),
 ) -> LLMProvider:
-    """Create LLM provider; deterministic test provider when OpenAI is not configured."""
-    if settings.LLM_PROVIDER == "openai" and settings.OPENAI_API_KEY:
-        return OpenAIProvider(
-            api_key=settings.OPENAI_API_KEY,
-            model=settings.OPENAI_MODEL,
-        )
-    return DeterministicTestProvider()
+    """Create config-selected LLM provider."""
+    return create_llm_provider(settings)

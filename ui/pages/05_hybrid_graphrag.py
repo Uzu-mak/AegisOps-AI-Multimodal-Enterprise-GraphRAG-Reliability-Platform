@@ -1,141 +1,143 @@
-"""Hybrid / GraphRAG page."""
+"""Ask AegisOps page."""
+from __future__ import annotations
+
+from collections import Counter
+
 import streamlit as st
+
 from ui.api_client import api_post
 from ui.framework import (
     capability_available,
     fetch_runtime_health,
+    render_dependency_notice,
     render_error_state,
-    render_health_cards,
     render_loading,
     render_page_header,
     render_sidebar,
     render_unavailable_state,
+    status_badge,
 )
+from ui.operations_catalog import format_memory_type, format_status
 
-st.set_page_config(page_title="Hybrid / GraphRAG — AegisOps", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="Ask AegisOps — AegisOps", page_icon="🧠", layout="wide", initial_sidebar_state="expanded")
 render_sidebar()
 render_page_header(
-    "Hybrid Retrieval & GraphRAG",
-    "Evidence-grounded answers combining semantic search, graph traversal, "
-    "and optional generation over canonical PostgreSQL memories.",
+    "Ask AegisOps",
+    "Natural-language operational questions with answer, recommended checks, evidence, similar incidents, provenance, and confidence.",
 )
 
 services = fetch_runtime_health()
-render_health_cards(
-    {k: services.get(k, {"status": "unknown"}) for k in ["api", "postgres", "qdrant", "neo4j", "llm"]}
+render_dependency_notice(services, ["api", "postgres", "qdrant", "neo4j", "llm"])
+
+available, reason = capability_available(services, ["api"])
+if not available:
+    render_unavailable_state(reason)
+    st.stop()
+
+question = st.text_area(
+    "Your question",
+    placeholder="What is the most likely cause of repeated vibration on pump P-102?",
+    height=120,
 )
 
-tab_rag, tab_hybrid = st.tabs(["GraphRAG Query", "Hybrid Retrieval"])
+query_ready = bool(question.strip())
+if st.button("Ask AegisOps", type="primary", disabled=not query_ready):
+    with render_loading("Analyzing question..."):
+        answer_result = api_post(
+            "/api/v1/graphrag/query",
+            {
+                "question": question,
+                "context_limit": 5,
+            },
+        )
+        similar_result = api_post(
+            "/api/v1/search/hybrid",
+            {
+                "query": question,
+                "mode": "hybrid",
+                "limit": 5,
+                "graph_hops": 2,
+            },
+        )
 
-with tab_rag:
-    st.info(
-        "GraphRAG responses are generated from retrieved evidence. "
-        "When test provider mode is active, generated text is deterministic and non-production."
-    )
+    if answer_result and "error" not in answer_result:
+        st.session_state.ask_answer = answer_result
+        st.session_state.ask_similar = similar_result if isinstance(similar_result, dict) and "error" not in similar_result else {}
+        st.success("Answer ready.")
+    else:
+        render_error_state("AegisOps query failed.")
 
-    rag_available, rag_reason = capability_available(services, ["api"])
-    if not rag_available:
-        render_unavailable_state(rag_reason)
-        st.stop()
+answer = st.session_state.get("ask_answer", {})
+similar = st.session_state.get("ask_similar", {})
 
-    question = st.text_area(
-        "Operational question",
-        placeholder="What failures have been observed on pump P-102 at the west facility?",
-        height=100,
-    )
-    col1, col2 = st.columns(2)
-    anchor_id = col1.text_input("Anchor Memory ID (optional)", "")
-    ctx_limit = col2.slider("Evidence context limit", 1, 10, 5)
+if answer:
+    st.divider()
+    st.subheader("Answer")
+    st.markdown(answer.get("answer", ""))
 
-    if st.button("Ask AegisOps", type="primary") and question:
-        with render_loading("Retrieving evidence and generating answer..."):
-            result = api_post(
-                "/api/v1/graphrag/query",
+    evidence = answer.get("evidence", [])
+    evidence_confidence = [item.get("confidence") for item in evidence if isinstance(item.get("confidence"), (int, float))]
+    confidence_value = sum(evidence_confidence) / len(evidence_confidence) if evidence_confidence else None
+
+    metrics = st.columns(3)
+    metrics[0].metric("Evidence Items", answer.get("evidence_count", len(evidence)))
+    metrics[1].metric("Confidence", f"{confidence_value:.0%}" if confidence_value is not None else "—")
+    metrics[2].metric("Provenance", answer.get("model_name", "—"))
+
+    st.subheader("Recommended Checks")
+    if evidence:
+        for item in evidence[:3]:
+            title = item.get("title") or format_memory_type(item.get("memory_type"))
+            summary = (item.get("content_preview") or item.get("content") or "")[:140]
+            st.write(f"- {title}: {summary}" if summary else f"- {title}")
+    else:
+        st.info("No recommended checks are available yet.")
+
+    st.subheader("Evidence")
+    if evidence:
+        for item in evidence:
+            with st.expander(f"{item.get('title', 'Untitled')} [{format_memory_type(item.get('memory_type'))}]"):
+                cols = st.columns(3)
+                cols[0].metric("Status", status_badge(item.get("status", "unknown")))
+                cols[1].metric("Asset / Equipment", item.get("asset_id") or item.get("facility_id") or "—")
+                cols[2].metric("Confidence", f"{float(item.get('confidence', 0) or 0):.0%}")
+                st.markdown(item.get("content_preview") or item.get("content") or "")
+    else:
+        st.info("No evidence has been retrieved yet.")
+
+    st.subheader("Similar Incidents")
+    similar_results = similar.get("results", []) if isinstance(similar, dict) else []
+    if similar_results:
+        table_rows = []
+        for item in similar_results:
+            table_rows.append(
                 {
+                    "Title": item.get("title") or "Untitled",
+                    "Type": format_memory_type(item.get("memory_type")),
+                    "Status": format_status(item.get("status")),
+                    "Asset": item.get("asset_id") or "—",
+                    "Confidence": f"{float(item.get('confidence', 0) or 0):.0%}",
+                    "Summary": (item.get("content_preview") or "")[:160],
+                }
+            )
+        st.dataframe(table_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No similar incidents have been found yet.")
+
+    with st.expander("Technical Details"):
+        st.json(
+            {
+                "answer_metadata": {
                     "question": question,
-                    "anchor_memory_id": anchor_id or None,
-                    "context_limit": ctx_limit,
+                    "evidence_count": answer.get("evidence_count", 0),
+                    "retrieval_mode": answer.get("retrieval_mode"),
+                    "is_synthetic_response": answer.get("is_synthetic_response"),
+                    "total_latency_ms": answer.get("total_latency_ms"),
                 },
-            )
-
-        if result and "error" not in result:
-            st.divider()
-            st.subheader("Answer")
-
-            if result.get("is_synthetic_response"):
-                st.warning(
-                    "⚠️ This answer was generated by the deterministic test provider. "
-                    "Set `OPENAI_API_KEY` in your `.env` for real LLM responses."
-                )
-
-            st.markdown(result.get("answer", ""))
-
-            st.divider()
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Evidence Items", result.get("evidence_count", 0))
-            col2.metric("Model", result.get("model_name", ""))
-            col3.metric("Total Latency", f"{result.get('total_latency_ms', 0):.0f}ms")
-
-            st.divider()
-            st.subheader("Evidence Used")
-            evidence = result.get("evidence", [])
-            for i, e in enumerate(evidence, 1):
-                with st.expander(
-                    f"[Memory {i}] {e.get('title', '')} — {e.get('memory_type', '')} "
-                    f"(source: {e.get('retrieval_source', '')})"
-                ):
-                    c1, c2 = st.columns(2)
-                    c1.metric("Confidence", f"{e.get('confidence', 0):.0%}")
-                    c2.metric("Asset", e.get("asset_id") or "—")
-                    st.markdown(e.get("content_preview", ""))
-                    st.caption(f"Memory ID: `{e.get('memory_id', '')}`")
-        else:
-            render_error_state("GraphRAG query failed.")
-            if result:
-                st.json(result)
-
-with tab_hybrid:
-    hybrid_available, hybrid_reason = capability_available(services, ["api"])
-    if not hybrid_available:
-        render_unavailable_state(hybrid_reason)
-        st.stop()
-
-    hybrid_query = st.text_input("Search query", placeholder="bearing wear fault")
-    mode = st.radio("Retrieval mode", ["hybrid", "semantic", "graph"], horizontal=True)
-    hlimit = st.slider("Max results", 1, 20, 10)
-    hops = st.slider("Graph hops (hybrid/graph mode)", 1, 5, 2)
-
-    if st.button("Retrieve", type="primary") and hybrid_query:
-        with render_loading("Retrieving..."):
-            result = api_post(
-                "/api/v1/search/hybrid",
-                {
-                    "query": hybrid_query,
-                    "mode": mode,
-                    "limit": hlimit,
-                    "graph_hops": hops,
+                "similar_request": {
+                    "query": question,
+                    "mode": "hybrid",
+                    "graph_hops": 2,
                 },
-            )
-
-        if result and "error" not in result:
-            results = result.get("results", [])
-            st.success(f"{len(results)} results via {mode} retrieval")
-            if isinstance(result.get("latency_ms"), (int, float)):
-                st.metric("Retrieval Latency", f"{result['latency_ms']:.1f}ms")
-
-            for r in results:
-                src = r.get("retrieval_source", "")
-                icon = "🔵" if src == "semantic" else "🟣" if src == "graph" else "🟢"
-                with st.expander(
-                    f"{icon} {r.get('title', '—')} [{r.get('memory_type', '')}]"
-                ):
-                    c1, c2, c3 = st.columns(3)
-                    c1.write(f"**Source:** {src}")
-                    c2.write(f"**Score:** {r.get('semantic_score', 'N/A')}")
-                    c3.write(f"**Asset:** {r.get('asset_id') or '—'}")
-                    st.caption(r.get("content_preview", ""))
-        else:
-            if isinstance(result, dict) and result.get("detail"):
-                render_error_state(str(result.get("detail")))
-            else:
-                render_error_state("Retrieval failed.")
+            }
+        )

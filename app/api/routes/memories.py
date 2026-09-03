@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from app.api.schemas.memory import (
     SupersedeMemoryRequest,
 )
 from app.db.models.memory import MemoryRecord
+from app.observability.metrics import metrics_collector
 from app.services.exceptions import (
     InvalidLifecycleTransitionError,
     InvalidMemoryDataError,
@@ -57,6 +59,7 @@ def create_memory(
     request: MemoryCreateRequest,
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryResponse:
+    started_at = time.monotonic()
     try:
         service_data = MemoryCreateData(
             memory_type=request.memory_type,
@@ -78,11 +81,35 @@ def create_memory(
             memory_metadata=request.metadata,
         )
         record = service.create_memory(data=service_data)
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="success",
+        )
         return memory_to_response(record)
-    except (InvalidMemoryDataError, MemoryConflictError, InvalidLifecycleTransitionError) as exc:
+    except MemoryConflictError as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="duplicate",
+        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except (InvalidMemoryDataError, InvalidLifecycleTransitionError) as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except MemoryNotFoundError as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="failed",
+        )
+        raise
 
 
 @router.get("/memories/{memory_id}", response_model=MemoryResponse)
@@ -131,6 +158,7 @@ def update_memory(
     request: MemoryUpdateRequest,
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryResponse:
+    started_at = time.monotonic()
     patch: dict[str, Any] = {}
     for field_name, value in request.model_dump(exclude_unset=True).items():
         if value is None:
@@ -140,11 +168,29 @@ def update_memory(
 
     try:
         record = service.update_memory(memory_id, patch=patch)
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="success",
+        )
         return memory_to_response(record)
     except (InvalidMemoryDataError, InvalidLifecycleTransitionError) as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except MemoryNotFoundError as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="failed",
+        )
+        raise
 
 
 @router.post("/memories/{memory_id}/archive", response_model=MemoryResponse)
@@ -152,13 +198,32 @@ def archive_memory(
     memory_id: UUID,
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryResponse:
+    started_at = time.monotonic()
     try:
         record = service.archive_memory(memory_id)
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="success",
+        )
         return memory_to_response(record)
     except (InvalidLifecycleTransitionError, MemoryConflictError) as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except MemoryNotFoundError as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="failed",
+        )
+        raise
 
 
 @router.post("/memories/{memory_id}/dispute", response_model=MemoryResponse)
@@ -166,13 +231,32 @@ def dispute_memory(
     memory_id: UUID,
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryResponse:
+    started_at = time.monotonic()
     try:
         record = service.dispute_memory(memory_id)
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="success",
+        )
         return memory_to_response(record)
     except (InvalidLifecycleTransitionError, MemoryConflictError) as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except MemoryNotFoundError as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="failed",
+        )
+        raise
 
 
 @router.post("/memories/{memory_id}/supersede", response_model=dict[str, MemoryResponse])
@@ -181,6 +265,7 @@ def supersede_memory(
     request: SupersedeMemoryRequest,
     service: MemoryService = Depends(get_memory_service),
 ) -> dict[str, MemoryResponse]:
+    started_at = time.monotonic()
     try:
         replacement_data = MemoryCreateData(
             memory_type=request.replacement.memory_type,
@@ -202,11 +287,35 @@ def supersede_memory(
             memory_metadata=request.replacement.metadata,
         )
         old_record, new_record = service.supersede_memory(memory_id, replacement_data)
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="success",
+        )
         return {
             "old_memory": memory_to_response(old_record),
             "replacement": memory_to_response(new_record),
         }
-    except (InvalidMemoryDataError, InvalidLifecycleTransitionError, MemoryConflictError) as exc:
+    except MemoryConflictError as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="duplicate",
+        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (InvalidMemoryDataError, InvalidLifecycleTransitionError) as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except MemoryNotFoundError as exc:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="rejected",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception:
+        metrics_collector.observe_canonical_write(
+            latency_ms=(time.monotonic() - started_at) * 1000,
+            outcome="failed",
+        )
+        raise

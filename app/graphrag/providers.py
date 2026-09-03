@@ -7,7 +7,14 @@ synthetic and are NOT suitable for production use.
 """
 from __future__ import annotations
 
-from app.graphrag.provider import LLMMessage, LLMProvider, LLMResponse
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from enum import Enum
+from importlib import import_module
+from typing import Any
+
+from app.core.config import Settings
+from app.graphrag.provider import LLMMessage, LLMProvider, LLMProviderError, LLMResponse
 
 _MODEL_NAME = "deterministic-test-v1"
 
@@ -59,23 +66,84 @@ class DeterministicTestProvider(LLMProvider):
         return _MODEL_NAME
 
 
+class LLMHealthState(str, Enum):
+    HEALTHY = "healthy"
+    UNCONFIGURED = "unconfigured"
+    DEGRADED = "degraded"
+
+
+@dataclass
+class LLMHealth:
+    status: LLMHealthState
+    provider: str
+    model: str
+    api_key_set: bool
+    error: str | None = None
+
+
+def _normalize_provider_name(provider: str | None) -> str:
+    return (provider or "test").strip().lower()
+
+
+def _extract_response_text(response: Any) -> str:
+    output_text = getattr(response, "output_text", None)
+    if output_text:
+        return str(output_text).strip()
+
+    chunks: list[str] = []
+    for item in getattr(response, "output", []) or []:
+        for content_part in getattr(item, "content", []) or []:
+            text = getattr(content_part, "text", None)
+            if text:
+                chunks.append(str(text))
+
+    joined = "\n".join(chunks).strip()
+    if joined:
+        return joined
+
+    raise LLMProviderError("OpenAI response did not contain text output.")
+
+
+def _usage_tokens(response: Any) -> tuple[int, int]:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return 0, 0
+    prompt_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+    completion_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+    return prompt_tokens, completion_tokens
+
+
 class OpenAIProvider(LLMProvider):
     """
     OpenAI API provider.
 
     Requires: pip install openai and OPENAI_API_KEY environment variable.
-    Model defaults to gpt-4o-mini to minimize cost.
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini") -> None:
-        try:
-            from openai import OpenAI
-            self._client = OpenAI(api_key=api_key)
-        except ImportError:
-            raise RuntimeError(
-                "openai package required. Install with: pip install openai"
-            )
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        timeout_seconds: float = 15.0,
+        client: Any | None = None,
+    ) -> None:
+        if not api_key or not api_key.strip():
+            raise LLMProviderError("OPENAI_API_KEY is required for OpenAI provider.")
+
+        if client is None:
+            try:
+                openai_module = import_module("openai")
+                openai_cls = getattr(openai_module, "OpenAI")
+            except Exception as exc:
+                raise LLMProviderError(
+                    "openai package is required for OpenAI provider."
+                ) from exc
+            self._client = openai_cls(api_key=api_key)
+        else:
+            self._client = client
+
         self._model = model
+        self._timeout_seconds = timeout_seconds
 
     def generate(
         self,
@@ -83,22 +151,103 @@ class OpenAIProvider(LLMProvider):
         temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> LLMResponse:
-        from openai import OpenAI
+        response_input = [
+            {
+                "role": m.role,
+                "content": [{"type": "input_text", "text": m.content}],
+            }
+            for m in messages
+        ]
 
-        oai_messages = [{"role": m.role, "content": m.content} for m in messages]
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=oai_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        choice = response.choices[0]
-        return LLMResponse(
-            content=choice.message.content or "",
-            model_name=self._model,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
-        )
+        try:
+            response = self._client.responses.create(
+                model=self._model,
+                input=response_input,
+                temperature=temperature,
+                max_output_tokens=max_tokens,
+                timeout=self._timeout_seconds,
+            )
+            content = _extract_response_text(response)
+            prompt_tokens, completion_tokens = _usage_tokens(response)
+            return LLMResponse(
+                content=content,
+                model_name=self._model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+        except LLMProviderError:
+            raise
+        except Exception as exc:
+            raise LLMProviderError("OpenAI response generation failed.") from exc
 
     def get_model_name(self) -> str:
         return self._model
+
+
+def create_llm_provider(settings: Settings) -> LLMProvider:
+    provider_name = _normalize_provider_name(settings.LLM_PROVIDER)
+
+    if provider_name == "openai" and settings.OPENAI_API_KEY:
+        return OpenAIProvider(
+            api_key=settings.OPENAI_API_KEY,
+            model=settings.LLM_MODEL,
+            timeout_seconds=settings.LLM_TIMEOUT_SECONDS,
+        )
+
+    if provider_name == "test":
+        return DeterministicTestProvider()
+
+    return DeterministicTestProvider()
+
+
+def llm_health_from_settings(settings: Settings) -> LLMHealth:
+    provider_name = _normalize_provider_name(settings.LLM_PROVIDER)
+    model_name = settings.LLM_MODEL
+    api_key_set = bool(settings.OPENAI_API_KEY)
+
+    if provider_name == "test":
+        return LLMHealth(
+            status=LLMHealthState.HEALTHY,
+            provider="test",
+            model=DeterministicTestProvider().get_model_name(),
+            api_key_set=api_key_set,
+        )
+
+    if provider_name != "openai":
+        return LLMHealth(
+            status=LLMHealthState.UNCONFIGURED,
+            provider=provider_name,
+            model=model_name,
+            api_key_set=api_key_set,
+            error="Unsupported LLM_PROVIDER value.",
+        )
+
+    if not api_key_set:
+        return LLMHealth(
+            status=LLMHealthState.UNCONFIGURED,
+            provider="openai",
+            model=model_name,
+            api_key_set=False,
+            error="OPENAI_API_KEY is not configured.",
+        )
+
+    try:
+        OpenAIProvider(
+            api_key=settings.OPENAI_API_KEY or "",
+            model=model_name,
+            timeout_seconds=settings.LLM_TIMEOUT_SECONDS,
+        )
+        return LLMHealth(
+            status=LLMHealthState.HEALTHY,
+            provider="openai",
+            model=model_name,
+            api_key_set=True,
+        )
+    except LLMProviderError as exc:
+        return LLMHealth(
+            status=LLMHealthState.DEGRADED,
+            provider="openai",
+            model=model_name,
+            api_key_set=True,
+            error=str(exc),
+        )

@@ -67,7 +67,14 @@ def test_semantic_search_uses_di_retriever(client_with_retriever_override: TestC
     body = response.json()
     assert body["mode"] == "semantic"
     assert body["total"] == 1
-    assert body["results"][0]["title"] == "Retrieved title"
+    result = body["results"][0]
+    assert result["title"] == "Retrieved title"
+    assert result["memory_type"] == MemoryType.OBSERVATION.value
+    assert result["status"] == MemoryStatus.ACTIVE.value
+    assert result["asset_id"] == "asset-1"
+    assert result["facility_id"] == "facility-1"
+    assert result["confidence"] == 0.9
+    assert result["content_preview"] == "Retrieved content"
 
 
 def test_hybrid_search_uses_di_retriever(client_with_retriever_override: TestClient):
@@ -80,3 +87,7 @@ def test_hybrid_search_uses_di_retriever(client_with_retriever_override: TestCli
     body = response.json()
     assert body["mode"] == "hybrid"
     assert body["total"] == 1
+    result = body["results"][0]
+    assert result["title"] == "Retrieved title"
+    assert result["memory_type"] == MemoryType.OBSERVATION.value
+    assert result["status"] == MemoryStatus.ACTIVE.value

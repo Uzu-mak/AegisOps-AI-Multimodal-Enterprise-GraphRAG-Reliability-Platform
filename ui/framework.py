@@ -1,6 +1,7 @@
 """Shared Streamlit UI framework for AegisOps pages."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Iterable
 
 import pandas as pd
@@ -19,26 +20,32 @@ _STATUS_ICON = {
 
 
 def render_sidebar() -> None:
-    """Render consistent application sidebar."""
+    """Render the persistent custom sidebar navigation for AegisOps."""
+
+    def page_link(path: str, label: str, icon: str | None = None) -> None:
+        kwargs: dict[str, Any] = {"label": label}
+        if icon:
+            kwargs["icon"] = icon
+        st.page_link(path, **kwargs)
+
     with st.sidebar:
         st.markdown("## AegisOps")
         st.caption("Operational Memory Platform")
         st.divider()
-        st.markdown(
-            """
-**Navigation**
+        st.markdown("**Operations**")
+        page_link("app.py", "Overview", "📊")
+        page_link("pages/06_incident_triage.py", "Incidents", "🏭")
+        page_link("pages/02_memory_explorer.py", "Equipment", "🛠️")
+        page_link("pages/03_semantic_search.py", "Investigate", "🔎")
+        page_link("pages/05_hybrid_graphrag.py", "Ask AegisOps", "🧠")
+        page_link("pages/07_working_memory.py", "History", "🕓")
 
-- Overview
-- Memory Explorer
-- Semantic Search
-- Graph Explorer
-- Hybrid / GraphRAG
-- Incident Triage
-- Working Memory
-- Evaluation
-- System Health
-            """
-        )
+        st.markdown("**Engineering / Admin**")
+        page_link("pages/11_memory_explorer.py", "Memory Explorer", "📂")
+        page_link("pages/04_graph_explorer.py", "Graph Explorer", "🕸️")
+        page_link("pages/08_evaluation.py", "Evaluation", "📈")
+        page_link("pages/09_system_health.py", "System Health", "🏥")
+        page_link("pages/10_projection_diagnostics.py", "Projection Diagnostics", "🧪")
 
 
 def render_page_header(title: str, subtitle: str | None = None) -> None:
@@ -101,6 +108,16 @@ def render_error_state(message: str) -> None:
 
 def render_unavailable_state(message: str) -> None:
     st.warning(f"Not available / backend capability not implemented yet: {message}")
+
+
+def render_dependency_notice(services: dict[str, dict[str, Any]], dependencies: list[str]) -> None:
+    degraded: list[str] = []
+    for key in dependencies:
+        state = str(services.get(key, {}).get("status", "unknown")).lower()
+        if state == "degraded":
+            degraded.append(key)
+    if degraded:
+        st.caption(f"Dependency warning: {', '.join(degraded)} service status is degraded.")
 
 
 def fetch_runtime_health() -> dict[str, dict[str, Any]]:

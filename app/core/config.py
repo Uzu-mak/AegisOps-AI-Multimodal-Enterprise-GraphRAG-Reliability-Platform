@@ -29,10 +29,21 @@ class Settings:
     NEO4J_PASSWORD: Final[str] = os.getenv("NEO4J_PASSWORD", "aegisops")
     NEO4J_DATABASE: Final[str] = os.getenv("NEO4J_DATABASE", "neo4j")
 
-    # LLM provider (optional — deterministic test provider used when unset)
+    # Kafka configuration
+    KAFKA_BOOTSTRAP_SERVERS: Final[str] = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+    KAFKA_PROJECTION_TOPIC: Final[str] = os.getenv(
+        "KAFKA_PROJECTION_TOPIC",
+        "aegisops.memory.projections.v1",
+    )
+    KAFKA_CLIENT_ID: Final[str] = os.getenv("KAFKA_CLIENT_ID", "aegisops-outbox-publisher")
+    KAFKA_ACK_TIMEOUT_SECONDS: Final[float] = float(os.getenv("KAFKA_ACK_TIMEOUT_SECONDS", "10.0"))
+    OUTBOX_PUBLISHER_POLL_SECONDS: Final[float] = float(os.getenv("OUTBOX_PUBLISHER_POLL_SECONDS", "1.0"))
+
+    # LLM provider configuration
     LLM_PROVIDER: Final[str] = os.getenv("LLM_PROVIDER", "test")  # "test" | "openai"
     OPENAI_API_KEY: Final[str | None] = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL: Final[str] = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    LLM_MODEL: Final[str] = os.getenv("LLM_MODEL", os.getenv("OPENAI_MODEL", "gpt-5.6-terra"))
+    LLM_TIMEOUT_SECONDS: Final[float] = float(os.getenv("LLM_TIMEOUT_SECONDS", "15"))
 
 
 @lru_cache

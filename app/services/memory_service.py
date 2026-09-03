@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
 from app.db.models.memory import MemoryRecord, MemoryStatus, MemoryType
 from app.outbox.models import ProjectionOutboxEvent, ProjectionStatus, ProjectionType
+from app.outbox.publisher import ProjectionEventType
 from app.repositories.memory_repository import SQLAlchemyMemoryRepository
 from app.semantic.index import SemanticIndexError
 from app.graph.index import GraphProjectionError
@@ -130,6 +131,7 @@ class RealMemoryService:
         session: Session,
         memory_id: UUID,
         operation: str,
+        event_type: ProjectionEventType,
     ) -> None:
         """
         Enqueue projection work inside the same PostgreSQL transaction.
@@ -143,6 +145,7 @@ class RealMemoryService:
             ProjectionType.NEO4J.value,
         ]
 
+        existing_latest: dict[str, ProjectionOutboxEvent] = {}
         for projection_type in target_projection_types:
             existing = session.scalar(
                 select(ProjectionOutboxEvent)
@@ -151,9 +154,33 @@ class RealMemoryService:
                     ProjectionOutboxEvent.projection_type == projection_type,
                     ProjectionOutboxEvent.operation == operation,
                 )
-                .order_by(ProjectionOutboxEvent.created_at.desc())
+                .order_by(ProjectionOutboxEvent.occurred_at.desc(), ProjectionOutboxEvent.created_at.desc())
                 .limit(1)
             )
+            if existing is not None:
+                existing_latest[projection_type] = existing
+
+        active_existing = [
+            row
+            for row in existing_latest.values()
+            if row.status in {
+                ProjectionStatus.PENDING.value,
+                ProjectionStatus.PROCESSING.value,
+                ProjectionStatus.RETRYING.value,
+            }
+        ]
+
+        if active_existing:
+            shared_event_id = active_existing[0].event_id
+            memory_version = active_existing[0].memory_version
+            occurred_at = active_existing[0].occurred_at
+        else:
+            shared_event_id = uuid4()
+            memory_version = self._next_memory_version(session, memory_id)
+            occurred_at = datetime.now(timezone.utc)
+
+        for projection_type in target_projection_types:
+            existing = existing_latest.get(projection_type)
 
             if existing is None:
                 session.add(
@@ -161,6 +188,11 @@ class RealMemoryService:
                         memory_id=memory_id,
                         projection_type=projection_type,
                         operation=operation,
+                        event_id=shared_event_id,
+                        event_type=event_type.value,
+                        memory_version=memory_version,
+                        schema_version=1,
+                        occurred_at=occurred_at,
                         status=ProjectionStatus.PENDING.value,
                     )
                 )
@@ -173,10 +205,27 @@ class RealMemoryService:
             }:
                 continue
 
+            existing.event_id = shared_event_id
+            existing.event_type = event_type.value
+            existing.memory_version = memory_version
+            existing.schema_version = 1
+            existing.occurred_at = occurred_at
             existing.status = ProjectionStatus.PENDING.value
             existing.retry_count = 0
             existing.error_message = None
             existing.completed_at = None
+            existing.kafka_publish_status = "pending"
+            existing.kafka_retry_count = 0
+            existing.kafka_error_message = None
+            existing.kafka_published_at = None
+
+    def _next_memory_version(self, session: Session, memory_id: UUID) -> int:
+        version_count = session.scalar(
+            select(func.count(distinct(ProjectionOutboxEvent.event_id))).where(
+                ProjectionOutboxEvent.memory_id == memory_id
+            )
+        )
+        return int(version_count or 0) + 1
 
     def create_memory(self, *, data: MemoryCreateData) -> MemoryRecord:
         self._validate_create_data(data)
@@ -188,6 +237,7 @@ class RealMemoryService:
                 session=session,
                 memory_id=created.id,
                 operation="project",
+                event_type=ProjectionEventType.MEMORY_CREATED,
             )
             session.commit()  # ← PostgreSQL commit FIRST
             materialized = self._materialize_memory_for_return(session, created)
@@ -292,6 +342,7 @@ class RealMemoryService:
                 session=session,
                 memory_id=memory.id,
                 operation="project",
+                event_type=ProjectionEventType.MEMORY_UPDATED,
             )
             session.commit()  # ← PostgreSQL commit FIRST
             materialized = self._materialize_memory_for_return(session, memory)
@@ -382,11 +433,13 @@ class RealMemoryService:
                 session=session,
                 memory_id=existing.id,
                 operation="status_update",
+                event_type=ProjectionEventType.MEMORY_SUPERSEDED,
             )
             self._enqueue_projection_events(
                 session=session,
                 memory_id=replacement.id,
                 operation="project",
+                event_type=ProjectionEventType.MEMORY_CREATED,
             )
             session.flush()
             session.commit()  # ← PostgreSQL commit FIRST
@@ -438,9 +491,18 @@ class RealMemoryService:
                 session=session,
                 memory_id=memory.id,
                 operation=outbox_operation,
+                event_type=self._event_type_for_status(target_status),
             )
             session.commit()
             return self._materialize_memory_for_return(session, memory)
+
+    def _event_type_for_status(self, status: str) -> ProjectionEventType:
+        mapping = {
+            MemoryStatus.ARCHIVED.value: ProjectionEventType.MEMORY_ARCHIVED,
+            MemoryStatus.DISPUTED.value: ProjectionEventType.MEMORY_DISPUTED,
+            MemoryStatus.SUPERSEDED.value: ProjectionEventType.MEMORY_SUPERSEDED,
+        }
+        return mapping.get(status, ProjectionEventType.MEMORY_UPDATED)
 
     def _validate_create_data(self, data: MemoryCreateData) -> None:
         if not data.title or not data.title.strip():

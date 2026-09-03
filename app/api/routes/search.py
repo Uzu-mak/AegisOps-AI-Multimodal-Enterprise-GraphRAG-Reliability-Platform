@@ -21,6 +21,7 @@ from app.api.deps import (
 from app.graph.neo4j_impl import Neo4jGraphMemoryIndex
 from app.graphrag.pipeline import GraphRAGPipeline
 from app.graphrag.provider import LLMProvider
+from app.observability.metrics import metrics_collector
 from app.retrieval.hybrid import HybridMemoryRetriever
 from app.semantic.qdrant_impl import QdrantSemanticIndex
 
@@ -124,11 +125,13 @@ def semantic_search(
         final_limit=request.limit,
     )
     results = retriever.retrieve(query)
+    latency_ms = (time.monotonic() - t0) * 1000
+    metrics_collector.observe_retrieval("semantic", latency_ms)
     return HybridRetrieveResponse(
         results=_format_results(results),
         total=len(results),
         mode="semantic",
-        latency_ms=(time.monotonic() - t0) * 1000,
+        latency_ms=latency_ms,
     )
 
 
@@ -179,11 +182,13 @@ def hybrid_retrieve(
         graph_hops=request.graph_hops,
     )
     results = retriever.retrieve(query)
+    latency_ms = (time.monotonic() - t0) * 1000
+    metrics_collector.observe_retrieval(request.mode, latency_ms)
     return HybridRetrieveResponse(
         results=_format_results(results),
         total=len(results),
         mode=request.mode,
-        latency_ms=(time.monotonic() - t0) * 1000,
+        latency_ms=latency_ms,
     )
 
 
@@ -209,9 +214,13 @@ def graph_related_memories(
             detail="Invalid memory_id UUID",
         )
 
+    import time
+
+    t0 = time.monotonic()
     related = graph_index.get_related_memory_ids(
         mid, max_hops=request.max_hops, limit=request.limit
     )
+    metrics_collector.observe_graph_traversal((time.monotonic() - t0) * 1000)
     return GraphRelatedResponse(
         anchor_memory_id=request.memory_id,
         related_memory_ids=[str(uid) for uid in related],
@@ -234,6 +243,18 @@ def graphrag_query(
     resp = pipeline.query(
         question=request.question,
         anchor_memory_id=request.anchor_memory_id,
+    )
+    metrics_collector.observe_graphrag_latencies(
+        retrieval_latency_ms=resp.retrieval_latency_ms,
+        total_latency_ms=resp.total_latency_ms,
+    )
+    metrics_collector.observe_llm_call(
+        provider="test" if resp.is_synthetic_response else "openai_or_custom",
+        model=resp.model_name,
+        success=resp.model_name != "error",
+        latency_ms=resp.generation_latency_ms,
+        prompt_tokens=resp.prompt_tokens,
+        completion_tokens=resp.completion_tokens,
     )
     return GraphRAGResponse(
         question=resp.question,

@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from app.outbox.models import ProjectionOutboxEvent, ProjectionStatus, ProjectionType
+from app.outbox.publisher import ProjectionEventType
 from app.outbox.worker import OutboxWorker
 
 
@@ -22,13 +23,22 @@ def make_event(
     e.memory_id = uuid4()
     e.projection_type = proj_type
     e.operation = "project"
+    e.event_id = uuid4()
+    e.event_type = ProjectionEventType.MEMORY_CREATED.value
+    e.memory_version = 1
+    e.schema_version = 1
     e.status = status
     e.retry_count = retry_count
     e.max_retries = max_retries
     e.error_message = None
+    e.occurred_at = datetime.now(timezone.utc)
+    e.kafka_publish_status = "pending"
+    e.kafka_retry_count = 0
+    e.kafka_error_message = None
     e.created_at = datetime.now(timezone.utc)
     e.updated_at = datetime.now(timezone.utc)
     e.completed_at = None
+    e.kafka_published_at = None
     return e
 
 

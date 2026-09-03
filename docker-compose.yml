@@ -19,6 +19,11 @@ services:
       NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-aegisops}
       NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_PROJECTION_TOPIC: ${KAFKA_PROJECTION_TOPIC:-aegisops.memory.projections.v1}
+      LLM_PROVIDER: ${LLM_PROVIDER:-test}
+      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-terra}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,6 +110,81 @@ services:
     networks:
       - aegisops-network
 
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: aegisops-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    ports:
+      - "9092:9092"
+    volumes:
+      - aegisops_kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - aegisops-network
+
+  kafka-init:
+    image: apache/kafka:4.3.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint:
+      [
+        "/bin/bash",
+        "-ec",
+        "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic aegisops.memory.projections.v1 --partitions 3 --replication-factor 1"
+      ]
+    networks:
+      - aegisops-network
+
+  outbox-publisher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegisops-outbox-publisher
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB}"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_PROJECTION_TOPIC: ${KAFKA_PROJECTION_TOPIC:-aegisops.memory.projections.v1}
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-aegisops-outbox-publisher}
+      OUTBOX_PUBLISHER_POLL_SECONDS: ${OUTBOX_PUBLISHER_POLL_SECONDS:-1.0}
+    command: ["python", "-m", "app.outbox.publisher"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - aegisops-network
+
   ui:
     build:
       context: .
@@ -120,6 +200,9 @@ services:
       NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-aegisops}
       AEGISOPS_API_URL: http://api:8000
+      LLM_PROVIDER: ${LLM_PROVIDER:-test}
+      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-terra}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     command:
       [
         "streamlit",
@@ -150,4 +233,6 @@ volumes:
   aegisops_neo4j_data:
     driver: local
   aegisops_neo4j_logs:
+    driver: local
+  aegisops_kafka_data:
     driver: local

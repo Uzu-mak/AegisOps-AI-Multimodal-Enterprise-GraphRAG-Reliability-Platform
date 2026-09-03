@@ -24,6 +24,10 @@ class LLMResponse:
     completion_tokens: int
 
 
+class LLMProviderError(Exception):
+    """Controlled provider error safe to surface in application responses."""
+
+
 class LLMProvider(Protocol):
     """Replaceable interface for LLM generation."""
 

@@ -10,9 +10,10 @@ from ui.framework import (
     render_page_header,
     render_sidebar,
     render_unavailable_state,
+    status_badge,
 )
 
-st.set_page_config(page_title="Graph Explorer — AegisOps", page_icon="🕸️", layout="wide")
+st.set_page_config(page_title="Graph Explorer — AegisOps", page_icon="🕸️", layout="wide", initial_sidebar_state="expanded")
 render_sidebar()
 render_page_header(
     "Graph Explorer",
@@ -70,7 +71,7 @@ if st.button("Explore Connections", type="primary") and memory_id:
                             f"🔗 {detail.get('title', 'Untitled')} — {detail.get('memory_type', '')}"
                         ):
                             c1, c2 = st.columns(2)
-                            c1.metric("Status", detail.get("status", ""))
+                            c1.metric("Status", status_badge(detail.get("status", "unknown")))
                             c2.metric("Asset", detail.get("asset_id") or "—")
                             st.caption(detail.get("content", "")[:300])
         else:

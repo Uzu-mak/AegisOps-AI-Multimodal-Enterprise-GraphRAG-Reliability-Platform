@@ -155,6 +155,11 @@ def test_create_memory_enqueues_projection_outbox_events(service):
     assert len(rows) == 2
     assert {row.projection_type for row in rows} == {"qdrant", "neo4j"}
     assert {row.operation for row in rows} == {"project"}
+    assert {row.event_type for row in rows} == {"MEMORY_CREATED"}
+    assert len({row.event_id for row in rows}) == 1
+    assert {row.memory_version for row in rows} == {1}
+    assert all(row.schema_version == 1 for row in rows)
+    assert all(row.kafka_published_at is None for row in rows)
 
 
 def test_projection_enqueue_is_idempotent_while_pending(service):
@@ -169,3 +174,4 @@ def test_projection_enqueue_is_idempotent_while_pending(service):
 
     assert len(rows) == 2
     assert {row.projection_type for row in rows} == {"qdrant", "neo4j"}
+    assert len({row.event_id for row in rows}) == 1

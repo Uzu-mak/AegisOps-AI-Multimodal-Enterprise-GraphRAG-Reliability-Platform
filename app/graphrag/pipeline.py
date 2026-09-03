@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from app.graphrag.context import BuiltContext, EvidenceItem, build_context
-from app.graphrag.provider import LLMMessage, LLMProvider
+from app.graphrag.provider import LLMMessage, LLMProvider, LLMProviderError
 from app.retrieval.hybrid import HybridMemoryRetriever
 from app.retrieval.models import RetrievalQuery, RetrievalResult
 
@@ -116,9 +116,16 @@ class GraphRAGPipeline:
             prompt_tokens = llm_resp.prompt_tokens
             completion_tokens = llm_resp.completion_tokens
             is_synthetic = "deterministic-test" in model_name
+        except LLMProviderError as exc:
+            logger.warning(f"GraphRAG LLM provider error: {exc}")
+            answer = f"[LLM generation unavailable: {exc}]"
+            model_name = "error"
+            prompt_tokens = 0
+            completion_tokens = 0
+            is_synthetic = True
         except Exception as exc:
             logger.error(f"GraphRAG LLM generation failed: {exc}")
-            answer = f"[LLM generation failed: {exc}]"
+            answer = "[LLM generation failed due to an unexpected error.]"
             model_name = "error"
             prompt_tokens = 0
             completion_tokens = 0

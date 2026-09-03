@@ -2,8 +2,8 @@
 AegisOps — Industrial AI Reliability Platform
 
 Navigation:
-  Overview · Memory Explorer · Semantic Search · Graph Explorer
-  Hybrid/GraphRAG · Incident Triage · Working Memory · Evaluation · System Health
+    Overview · Incidents · Equipment · Investigate · Ask AegisOps · History
+    Memory Explorer · Graph Explorer · Evaluation · System Health · Projection Diagnostics
 """
 import streamlit as st
 
@@ -26,28 +26,23 @@ render_page_header(
 
 st.markdown(
     """
-AegisOps integrates three complementary memory layers to power evidence-grounded
-operational intelligence for manufacturing reliability and infrastructure management.
+AegisOps is organized into operator workflows and technical administration views.
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| **Canonical Memory** | PostgreSQL | Single source of truth for all operational memories |
-| **Semantic Memory** | Qdrant | Vector similarity search over memory content |
-| **Graph Memory** | Neo4j | Relationship traversal (assets, incidents, components) |
-| **Hybrid Retrieval** | Combined | Semantic + graph + canonical hydration |
-| **GraphRAG** | LLM + Evidence | Grounded answers with explicit citations |
+| Section | Purpose |
+|---|---|
+| **Operations** | Incidents, Equipment, Investigate, Ask AegisOps, and History |
+| **Engineering / Admin** | Memory Explorer, Graph Explorer, Evaluation, System Health, and Projection Diagnostics |
 
 ---
 
-**Navigate using the sidebar** to explore memory records, run searches, triage incidents,
-and inspect the AI reasoning pipeline.
+**Navigate using the sidebar** to move between operator workflows and technical diagnostics.
     """
 )
 
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.info("📂 Use **Memory Explorer** to inspect and filter canonical records.")
+    st.info("🏭 Use **Incidents** to investigate and route operational issues.")
 with col2:
-    st.info("🔍 Use **Semantic Search** or **Hybrid/GraphRAG** for AI-powered queries.")
+    st.info("🧠 Use **Ask AegisOps** for natural-language operational questions.")
 with col3:
-    st.info("🏥 Use **Incident Triage** to create and link operational memories.")
+    st.info("📂 Use **Engineering / Admin** pages for memory, graph, and projection diagnostics.")
