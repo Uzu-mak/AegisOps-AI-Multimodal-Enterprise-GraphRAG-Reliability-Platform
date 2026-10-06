@@ -1,0 +1,3364 @@
+{
+  "dataset": "source-grounded",
+  "disclaimer": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+  "timestamp": "20261005T235309Z",
+  "commit": "unknown",
+  "corpus_size": 6,
+  "query_count": 60,
+  "relevant_memory_count": 6,
+  "fault_family_count": 6,
+  "queries_per_fault_family": {
+    "vision_environmental_variation": 10,
+    "vision_false_detection": 10,
+    "vision_glare": 10,
+    "vision_image_quality": 10,
+    "vision_position_deviation": 10,
+    "vision_target_variation": 10
+  },
+  "by_fault_family": {
+    "vision_environmental_variation": {
+      "query_count": 10,
+      "summary_by_method": {
+        "vector": {
+          "Recall@5": 0.7,
+          "Recall@10": 1.0,
+          "MRR": 0.341667
+        },
+        "graph": {
+          "Recall@5": 0.9,
+          "Recall@10": 0.9,
+          "MRR": 0.18
+        },
+        "hybrid": {
+          "Recall@5": 0.7,
+          "Recall@10": 1.0,
+          "MRR": 0.341667
+        }
+      }
+    },
+    "vision_false_detection": {
+      "query_count": 10,
+      "summary_by_method": {
+        "vector": {
+          "Recall@5": 0.8,
+          "Recall@10": 1.0,
+          "MRR": 0.383333
+        },
+        "graph": {
+          "Recall@5": 0.9,
+          "Recall@10": 0.9,
+          "MRR": 0.5
+        },
+        "hybrid": {
+          "Recall@5": 0.8,
+          "Recall@10": 1.0,
+          "MRR": 0.383333
+        }
+      }
+    },
+    "vision_glare": {
+      "query_count": 10,
+      "summary_by_method": {
+        "vector": {
+          "Recall@5": 1.0,
+          "Recall@10": 1.0,
+          "MRR": 0.586667
+        },
+        "graph": {
+          "Recall@5": 0.6,
+          "Recall@10": 0.6,
+          "MRR": 0.145
+        },
+        "hybrid": {
+          "Recall@5": 1.0,
+          "Recall@10": 1.0,
+          "MRR": 0.586667
+        }
+      }
+    },
+    "vision_image_quality": {
+      "query_count": 10,
+      "summary_by_method": {
+        "vector": {
+          "Recall@5": 0.9,
+          "Recall@10": 1.0,
+          "MRR": 0.461667
+        },
+        "graph": {
+          "Recall@5": 0.8,
+          "Recall@10": 0.8,
+          "MRR": 0.241667
+        },
+        "hybrid": {
+          "Recall@5": 0.9,
+          "Recall@10": 1.0,
+          "MRR": 0.461667
+        }
+      }
+    },
+    "vision_position_deviation": {
+      "query_count": 10,
+      "summary_by_method": {
+        "vector": {
+          "Recall@5": 1.0,
+          "Recall@10": 1.0,
+          "MRR": 0.411667
+        },
+        "graph": {
+          "Recall@5": 0.9,
+          "Recall@10": 0.9,
+          "MRR": 0.9
+        },
+        "hybrid": {
+          "Recall@5": 1.0,
+          "Recall@10": 1.0,
+          "MRR": 0.411667
+        }
+      }
+    },
+    "vision_target_variation": {
+      "query_count": 10,
+      "summary_by_method": {
+        "vector": {
+          "Recall@5": 0.7,
+          "Recall@10": 1.0,
+          "MRR": 0.411667
+        },
+        "graph": {
+          "Recall@5": 0.8,
+          "Recall@10": 0.8,
+          "MRR": 0.333333
+        },
+        "hybrid": {
+          "Recall@5": 0.7,
+          "Recall@10": 1.0,
+          "MRR": 0.411667
+        }
+      }
+    }
+  },
+  "retriever_configs": {
+    "top_k": 10,
+    "fusion_constant_k": 60,
+    "embedding_model": "DeterministicFakeEmbedding(dimension=128)",
+    "latency_includes_query_embedding": true,
+    "warmup_runs": 1,
+    "repeats_per_query": 5
+  },
+  "service_versions": {
+    "python": "3.12.14",
+    "postgres": "postgres:16-alpine",
+    "qdrant": "qdrant/qdrant:latest",
+    "neo4j": "neo4j:5.26-community"
+  },
+  "summary_by_method": {
+    "vector": {
+      "Recall@5": 0.85,
+      "Recall@10": 1.0,
+      "MRR": 0.432778,
+      "p50_latency_ms": 50.058,
+      "p95_latency_ms": 59.743
+    },
+    "graph": {
+      "Recall@5": 0.816667,
+      "Recall@10": 0.816667,
+      "MRR": 0.383333,
+      "p50_latency_ms": 9.379,
+      "p95_latency_ms": 16.022
+    },
+    "hybrid": {
+      "Recall@5": 0.85,
+      "Recall@10": 1.0,
+      "MRR": 0.432778,
+      "p50_latency_ms": 59.782,
+      "p95_latency_ms": 66.33
+    }
+  },
+  "query_rows": [
+    {
+      "query_id": "keyence-background-false-detection-q01",
+      "fault_family": "vision_false_detection",
+      "query_text": "How should I diagnose false detections when background elements enter the image?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 49.90820099192206,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 10.136433993466198,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 58.050647989148274,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q02",
+      "fault_family": "vision_false_detection",
+      "query_text": "What is the likely cause of false detections when background elements enter the image?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.09182899084408,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 11.728156998287886,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.782172998879105,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q03",
+      "fault_family": "vision_false_detection",
+      "query_text": "What corrective action is recommended for false detections when background elements enter the image?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 49.99959499400575,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 8.060311985900626,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 62.32313999498729,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q04",
+      "fault_family": "vision_false_detection",
+      "query_text": "Which inspection setting should I check for false detections when background elements enter the image?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 49.75416499655694,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 7.764644004055299,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 50.064057009876706,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q05",
+      "fault_family": "vision_false_detection",
+      "query_text": "How can I reduce false detections when background elements enter the image without replacing the vision sensor?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.49519200110808,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 7.329993997700512,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 58.027821010909975,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q06",
+      "fault_family": "vision_false_detection",
+      "query_text": "The line reports false detections when background elements enter the image. What source-backed remedy should I try?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 50.418488986906596,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 18.060315007460304,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 50.26546199223958,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q07",
+      "fault_family": "vision_false_detection",
+      "query_text": "What condition can lead to false detections when background elements enter the image, and how should it be addressed?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 49.90243900101632,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 9.756706000189297,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 60.23542900220491,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q08",
+      "fault_family": "vision_false_detection",
+      "query_text": "Which IV4 function addresses false detections when background elements enter the image?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 50.688866002019495,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 7.70018799812533,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 59.32147000567056,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q09",
+      "fault_family": "vision_false_detection",
+      "query_text": "What should maintenance verify first for false detections when background elements enter the image?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.04959899815731,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 7.464852009434253,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 53.422761004185304,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-background-false-detection-q10",
+      "fault_family": "vision_false_detection",
+      "query_text": "How can the inspection be made more stable given false detections when background elements enter the image?",
+      "relevant_memory_ids": [
+        "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.097638988518156,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 9.716193992062472,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 65.88407199888024,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q01",
+      "fault_family": "vision_image_quality",
+      "query_text": "How should I diagnose inspection features are not clearly separated in the captured image?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 49.81243899965193,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 9.961307005141862,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 59.093568997923285,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q02",
+      "fault_family": "vision_image_quality",
+      "query_text": "What is the likely cause of inspection features are not clearly separated in the captured image?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 59.77036300464533,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 11.505101007060148,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 60.53246899682563,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q03",
+      "fault_family": "vision_image_quality",
+      "query_text": "What corrective action is recommended for inspection features are not clearly separated in the captured image?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.15710099542048,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 13.489297998603433,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 59.67494900687598,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q04",
+      "fault_family": "vision_image_quality",
+      "query_text": "Which inspection setting should I check for inspection features are not clearly separated in the captured image?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 49.84831900219433,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 9.561324986862019,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 61.48325599497184,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q05",
+      "fault_family": "vision_image_quality",
+      "query_text": "How can I reduce inspection features are not clearly separated in the captured image without replacing the vision sensor?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 50.36345998814795,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 18.187409004895017,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 63.473846996203065,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q06",
+      "fault_family": "vision_image_quality",
+      "query_text": "The line reports inspection features are not clearly separated in the captured image. What source-backed remedy should I try?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.10947500704788,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 8.69847099238541,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 67.27813300676644,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q07",
+      "fault_family": "vision_image_quality",
+      "query_text": "What condition can lead to inspection features are not clearly separated in the captured image, and how should it be addressed?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 59.590288990875706,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 15.914477000478655,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 56.52055499376729,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q08",
+      "fault_family": "vision_image_quality",
+      "query_text": "Which IV4 function addresses inspection features are not clearly separated in the captured image?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 49.72764900594484,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 7.0460529968841,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.57328399561811,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q09",
+      "fault_family": "vision_image_quality",
+      "query_text": "What should maintenance verify first for inspection features are not clearly separated in the captured image?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 49.92658199626021,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 9.597732001566328,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 61.02719499904197,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-suboptimal-detection-image-q10",
+      "fault_family": "vision_image_quality",
+      "query_text": "How can the inspection be made more stable given inspection features are not clearly separated in the captured image?",
+      "relevant_memory_ids": [
+        "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 49.865779001265764,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 11.407415993744507,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 64.89823800802696,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q01",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "How should I diagnose inspection results vary after a small ambient-light or surface-finish change?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.0223559938604,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 7.553903997177258,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 55.76790000486653,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q02",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "What is the likely cause of inspection results vary after a small ambient-light or surface-finish change?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 50.068087002728134,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 9.857899000053294,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 50.53435500303749,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q03",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "What corrective action is recommended for inspection results vary after a small ambient-light or surface-finish change?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 50.00889301300049,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 5.963778996374458,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 57.1367550001014,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q04",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "Which inspection setting should I check for inspection results vary after a small ambient-light or surface-finish change?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 59.56533800053876,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 7.737100997474045,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 50.99764799524564,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q05",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "How can I reduce inspection results vary after a small ambient-light or surface-finish change without replacing the vision sensor?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 49.87764899851754,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 9.86489599745255,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 59.54015800671186,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q06",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "The line reports inspection results vary after a small ambient-light or surface-finish change. What source-backed remedy should I try?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 50.01701301080175,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 5.962465991615318,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 61.24392199853901,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q07",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "What condition can lead to inspection results vary after a small ambient-light or surface-finish change, and how should it be addressed?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 49.97526199440472,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 9.594585004379041,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.063110000337474,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q08",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "Which IV4 function addresses inspection results vary after a small ambient-light or surface-finish change?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 49.99355999461841,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 7.407861005049199,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 50.4399470082717,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q09",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "What should maintenance verify first for inspection results vary after a small ambient-light or surface-finish change?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 50.01043099036906,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 6.48223799362313,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 59.343369997804984,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-ambient-change-detection-q10",
+      "fault_family": "vision_environmental_variation",
+      "query_text": "How can the inspection be made more stable given inspection results vary after a small ambient-light or surface-finish change?",
+      "relevant_memory_ids": [
+        "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 59.90774399833754,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 8.406878987443633,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 66.2798789999215,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q01",
+      "fault_family": "vision_target_variation",
+      "query_text": "How should I diagnose a vision inspection becomes inconsistent across individual product variations?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.09670299477875,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 11.565035005332902,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 60.705598996719345,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q02",
+      "fault_family": "vision_target_variation",
+      "query_text": "What is the likely cause of a vision inspection becomes inconsistent across individual product variations?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.10178001248278,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 21.08926400251221,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 59.888871997827664,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q03",
+      "fault_family": "vision_target_variation",
+      "query_text": "What corrective action is recommended for a vision inspection becomes inconsistent across individual product variations?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 50.14738498721272,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 9.056638009496965,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 61.37587300327141,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q04",
+      "fault_family": "vision_target_variation",
+      "query_text": "Which inspection setting should I check for a vision inspection becomes inconsistent across individual product variations?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.150188006227836,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 9.197450999636203,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 58.12195599719416,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q05",
+      "fault_family": "vision_target_variation",
+      "query_text": "How can I reduce a vision inspection becomes inconsistent across individual product variations without replacing the vision sensor?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 49.8735349974595,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 6.541676993947476,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 60.377362999133766,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q06",
+      "fault_family": "vision_target_variation",
+      "query_text": "The line reports a vision inspection becomes inconsistent across individual product variations. What source-backed remedy should I try?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 49.996757006738335,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 10.459430995979346,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 61.25554599566385,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q07",
+      "fault_family": "vision_target_variation",
+      "query_text": "What condition can lead to a vision inspection becomes inconsistent across individual product variations, and how should it be addressed?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 50.06757199589629,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 7.447042997227982,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 58.32156300311908,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q08",
+      "fault_family": "vision_target_variation",
+      "query_text": "Which IV4 function addresses a vision inspection becomes inconsistent across individual product variations?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 50.07759400177747,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 11.981345000094734,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 69.06828501087148,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q09",
+      "fault_family": "vision_target_variation",
+      "query_text": "What should maintenance verify first for a vision inspection becomes inconsistent across individual product variations?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 49.92033599410206,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 10.400491999462247,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 60.28869000147097,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-variation-q10",
+      "fault_family": "vision_target_variation",
+      "query_text": "How can the inspection be made more stable given a vision inspection becomes inconsistent across individual product variations?",
+      "relevant_memory_ids": [
+        "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 50.066834010067396,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 7.5080120004713535,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 0.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.16666666666666666,
+          "latency_ms": 57.56534500687849,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q01",
+      "fault_family": "vision_position_deviation",
+      "query_text": "How should I diagnose a passing part is misaligned and a point sensor produces false detections?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.03883098834194,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 7.857618998968974,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 59.332698001526296,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q02",
+      "fault_family": "vision_position_deviation",
+      "query_text": "What is the likely cause of a passing part is misaligned and a point sensor produces false detections?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 49.93285199452657,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 7.47831299668178,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 60.16166601330042,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q03",
+      "fault_family": "vision_position_deviation",
+      "query_text": "What corrective action is recommended for a passing part is misaligned and a point sensor produces false detections?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 49.988772996584885,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 5.955348999123089,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 65.34298599581234,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q04",
+      "fault_family": "vision_position_deviation",
+      "query_text": "Which inspection setting should I check for a passing part is misaligned and a point sensor produces false detections?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.07619899697602,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 7.374902997980826,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 62.76681199960876,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q05",
+      "fault_family": "vision_position_deviation",
+      "query_text": "How can I reduce a passing part is misaligned and a point sensor produces false detections without replacing the vision sensor?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 59.97046400443651,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 5.187707007280551,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 59.14802300685551,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q06",
+      "fault_family": "vision_position_deviation",
+      "query_text": "The line reports a passing part is misaligned and a point sensor produces false detections. What source-backed remedy should I try?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 50.091811004676856,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 6.828340992797166,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 57.07300000358373,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q07",
+      "fault_family": "vision_position_deviation",
+      "query_text": "What condition can lead to a passing part is misaligned and a point sensor produces false detections, and how should it be addressed?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.04170000029262,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 7.714877996477298,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 60.65076599770691,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q08",
+      "fault_family": "vision_position_deviation",
+      "query_text": "Which IV4 function addresses a passing part is misaligned and a point sensor produces false detections?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 59.741799006587826,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 10.383428001659922,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 62.21563500002958,
+          "candidate_ids": [
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q09",
+      "fault_family": "vision_position_deviation",
+      "query_text": "What should maintenance verify first for a passing part is misaligned and a point sensor produces false detections?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 50.132659991504624,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 11.24697299383115,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 61.837693996494636,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-target-position-deviation-q10",
+      "fault_family": "vision_position_deviation",
+      "query_text": "How can the inspection be made more stable given a passing part is misaligned and a point sensor produces false detections?",
+      "relevant_memory_ids": [
+        "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 49.89510901214089,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 9.569818997988477,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 69.37322601152118,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q01",
+      "fault_family": "vision_glare",
+      "query_text": "How should I diagnose a glossy metal target produces false detections from reflected light?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 49.96182399918325,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 7.614950998686254,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 49.986329991952516,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q02",
+      "fault_family": "vision_glare",
+      "query_text": "What is the likely cause of a glossy metal target produces false detections from reflected light?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 49.92272300296463,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 6.43073400715366,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 62.37354999757372,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q03",
+      "fault_family": "vision_glare",
+      "query_text": "What corrective action is recommended for a glossy metal target produces false detections from reflected light?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 50.16704999434296,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 15.057797994813882,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 65.68988799699582,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q04",
+      "fault_family": "vision_glare",
+      "query_text": "Which inspection setting should I check for a glossy metal target produces false detections from reflected light?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 50.201516001834534,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 11.872022005263716,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.5,
+          "latency_ms": 51.07691101147793,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q05",
+      "fault_family": "vision_glare",
+      "query_text": "How can I reduce a glossy metal target produces false detections from reflected light without replacing the vision sensor?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 49.83522499969695,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 10.43331899563782,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 60.727435993612744,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q06",
+      "fault_family": "vision_glare",
+      "query_text": "The line reports a glossy metal target produces false detections from reflected light. What source-backed remedy should I try?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 50.02497100213077,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 7.607908992213197,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.2,
+          "latency_ms": 59.47273400670383,
+          "candidate_ids": [
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q07",
+      "fault_family": "vision_glare",
+      "query_text": "What condition can lead to a glossy metal target produces false detections from reflected light, and how should it be addressed?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 50.11557099351194,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 13.884931991924532,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 58.14000900136307,
+          "candidate_ids": [
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q08",
+      "fault_family": "vision_glare",
+      "query_text": "Which IV4 function addresses a glossy metal target produces false detections from reflected light?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 49.98733100364916,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        },
+        "graph": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.25,
+          "latency_ms": 15.377603995148093,
+          "candidate_ids": [
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 0.3333333333333333,
+          "latency_ms": 61.3209180010017,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q09",
+      "fault_family": "vision_glare",
+      "query_text": "What should maintenance verify first for a glossy metal target produces false detections from reflected light?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 50.30557600548491,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 13.459212990710512,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 64.19076499878429,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    },
+    {
+      "query_id": "keyence-glare-false-detection-q10",
+      "fault_family": "vision_glare",
+      "query_text": "How can the inspection be made more stable given a glossy metal target produces false detections from reflected light?",
+      "relevant_memory_ids": [
+        "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+      ],
+      "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.",
+      "method_results": {
+        "vector": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 50.105225993320346,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        },
+        "graph": {
+          "recall@5": 0.0,
+          "recall@10": 0.0,
+          "mrr@10": 0.0,
+          "latency_ms": 8.492626002407633,
+          "candidate_ids": [
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+          ]
+        },
+        "hybrid": {
+          "recall@5": 1.0,
+          "recall@10": 1.0,
+          "mrr@10": 1.0,
+          "latency_ms": 54.708978001144715,
+          "candidate_ids": [
+            "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c",
+            "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b",
+            "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd",
+            "7343f77a-0e04-4ce5-9f74-2a291a349fe7",
+            "d8b0dbf2-23a2-4f6e-a535-858249fd81f6",
+            "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+          ]
+        }
+      },
+      "all_zero_relevant_results": false
+    }
+  ],
+  "zero_result_queries": [],
+  "notes": "Latency measurements include query embedding and retrieval for the method under test, matching the real production path.",
+  "source_memory_count": 6,
+  "source_manifest": "data/evaluation/source_manifest.json",
+  "query_dataset_sha256": "1e862317432753b9b4afc3ca1967edbb80dec76c4c9e47c73e3ab28da631e6bb"
+}

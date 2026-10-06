@@ -1,0 +1,4 @@
+dataset,method,Recall@5,Recall@10,MRR,p50_latency_ms,p95_latency_ms,query_count,relevant_memory_count,fault_family_count,disclaimer
+source-grounded,vector,0.85,1.0,0.432778,50.058,59.743,60,6,6,These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.
+source-grounded,graph,0.816667,0.816667,0.383333,9.379,16.022,60,6,6,These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.
+source-grounded,hybrid,0.85,1.0,0.432778,59.782,66.33,60,6,6,These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments.

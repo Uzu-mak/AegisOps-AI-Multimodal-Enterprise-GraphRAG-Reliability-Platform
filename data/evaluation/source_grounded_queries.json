@@ -1,0 +1,842 @@
+[
+  {
+    "query_id": "keyence-background-false-detection-q01",
+    "query_text": "How should I diagnose false detections when background elements enter the image?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q02",
+    "query_text": "What is the likely cause of false detections when background elements enter the image?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q03",
+    "query_text": "What corrective action is recommended for false detections when background elements enter the image?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q04",
+    "query_text": "Which inspection setting should I check for false detections when background elements enter the image?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q05",
+    "query_text": "How can I reduce false detections when background elements enter the image without replacing the vision sensor?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q06",
+    "query_text": "The line reports false detections when background elements enter the image. What source-backed remedy should I try?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q07",
+    "query_text": "What condition can lead to false detections when background elements enter the image, and how should it be addressed?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q08",
+    "query_text": "Which IV4 function addresses false detections when background elements enter the image?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q09",
+    "query_text": "What should maintenance verify first for false detections when background elements enter the image?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-background-false-detection-q10",
+    "query_text": "How can the inspection be made more stable given false detections when background elements enter the image?",
+    "fault_family": "vision_false_detection",
+    "relevant_memory_ids": [
+      "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Background Removal and Extraction of Only the Detection Target",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q01",
+    "query_text": "How should I diagnose inspection features are not clearly separated in the captured image?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q02",
+    "query_text": "What is the likely cause of inspection features are not clearly separated in the captured image?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q03",
+    "query_text": "What corrective action is recommended for inspection features are not clearly separated in the captured image?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q04",
+    "query_text": "Which inspection setting should I check for inspection features are not clearly separated in the captured image?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q05",
+    "query_text": "How can I reduce inspection features are not clearly separated in the captured image without replacing the vision sensor?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q06",
+    "query_text": "The line reports inspection features are not clearly separated in the captured image. What source-backed remedy should I try?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q07",
+    "query_text": "What condition can lead to inspection features are not clearly separated in the captured image, and how should it be addressed?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q08",
+    "query_text": "Which IV4 function addresses inspection features are not clearly separated in the captured image?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q09",
+    "query_text": "What should maintenance verify first for inspection features are not clearly separated in the captured image?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-suboptimal-detection-image-q10",
+    "query_text": "How can the inspection be made more stable given inspection features are not clearly separated in the captured image?",
+    "fault_family": "vision_image_quality",
+    "relevant_memory_ids": [
+      "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q01",
+    "query_text": "How should I diagnose inspection results vary after a small ambient-light or surface-finish change?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q02",
+    "query_text": "What is the likely cause of inspection results vary after a small ambient-light or surface-finish change?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q03",
+    "query_text": "What corrective action is recommended for inspection results vary after a small ambient-light or surface-finish change?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q04",
+    "query_text": "Which inspection setting should I check for inspection results vary after a small ambient-light or surface-finish change?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q05",
+    "query_text": "How can I reduce inspection results vary after a small ambient-light or surface-finish change without replacing the vision sensor?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q06",
+    "query_text": "The line reports inspection results vary after a small ambient-light or surface-finish change. What source-backed remedy should I try?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q07",
+    "query_text": "What condition can lead to inspection results vary after a small ambient-light or surface-finish change, and how should it be addressed?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q08",
+    "query_text": "Which IV4 function addresses inspection results vary after a small ambient-light or surface-finish change?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q09",
+    "query_text": "What should maintenance verify first for inspection results vary after a small ambient-light or surface-finish change?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-ambient-change-detection-q10",
+    "query_text": "How can the inspection be made more stable given inspection results vary after a small ambient-light or surface-finish change?",
+    "fault_family": "vision_environmental_variation",
+    "relevant_memory_ids": [
+      "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q01",
+    "query_text": "How should I diagnose a vision inspection becomes inconsistent across individual product variations?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q02",
+    "query_text": "What is the likely cause of a vision inspection becomes inconsistent across individual product variations?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q03",
+    "query_text": "What corrective action is recommended for a vision inspection becomes inconsistent across individual product variations?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q04",
+    "query_text": "Which inspection setting should I check for a vision inspection becomes inconsistent across individual product variations?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q05",
+    "query_text": "How can I reduce a vision inspection becomes inconsistent across individual product variations without replacing the vision sensor?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q06",
+    "query_text": "The line reports a vision inspection becomes inconsistent across individual product variations. What source-backed remedy should I try?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q07",
+    "query_text": "What condition can lead to a vision inspection becomes inconsistent across individual product variations, and how should it be addressed?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q08",
+    "query_text": "Which IV4 function addresses a vision inspection becomes inconsistent across individual product variations?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q09",
+    "query_text": "What should maintenance verify first for a vision inspection becomes inconsistent across individual product variations?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-variation-q10",
+    "query_text": "How can the inspection be made more stable given a vision inspection becomes inconsistent across individual product variations?",
+    "fault_family": "vision_target_variation",
+    "relevant_memory_ids": [
+      "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q01",
+    "query_text": "How should I diagnose a passing part is misaligned and a point sensor produces false detections?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q02",
+    "query_text": "What is the likely cause of a passing part is misaligned and a point sensor produces false detections?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q03",
+    "query_text": "What corrective action is recommended for a passing part is misaligned and a point sensor produces false detections?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q04",
+    "query_text": "Which inspection setting should I check for a passing part is misaligned and a point sensor produces false detections?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q05",
+    "query_text": "How can I reduce a passing part is misaligned and a point sensor produces false detections without replacing the vision sensor?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q06",
+    "query_text": "The line reports a passing part is misaligned and a point sensor produces false detections. What source-backed remedy should I try?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q07",
+    "query_text": "What condition can lead to a passing part is misaligned and a point sensor produces false detections, and how should it be addressed?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q08",
+    "query_text": "Which IV4 function addresses a passing part is misaligned and a point sensor produces false detections?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q09",
+    "query_text": "What should maintenance verify first for a passing part is misaligned and a point sensor produces false detections?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-target-position-deviation-q10",
+    "query_text": "How can the inspection be made more stable given a passing part is misaligned and a point sensor produces false detections?",
+    "fault_family": "vision_position_deviation",
+    "relevant_memory_ids": [
+      "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q01",
+    "query_text": "How should I diagnose a glossy metal target produces false detections from reflected light?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q02",
+    "query_text": "What is the likely cause of a glossy metal target produces false detections from reflected light?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q03",
+    "query_text": "What corrective action is recommended for a glossy metal target produces false detections from reflected light?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q04",
+    "query_text": "Which inspection setting should I check for a glossy metal target produces false detections from reflected light?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q05",
+    "query_text": "How can I reduce a glossy metal target produces false detections from reflected light without replacing the vision sensor?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q06",
+    "query_text": "The line reports a glossy metal target produces false detections from reflected light. What source-backed remedy should I try?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q07",
+    "query_text": "What condition can lead to a glossy metal target produces false detections from reflected light, and how should it be addressed?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q08",
+    "query_text": "Which IV4 function addresses a glossy metal target produces false detections from reflected light?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q09",
+    "query_text": "What should maintenance verify first for a glossy metal target produces false detections from reflected light?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  },
+  {
+    "query_id": "keyence-glare-false-detection-q10",
+    "query_text": "How can the inspection be made more stable given a glossy metal target produces false detections from reflected light?",
+    "fault_family": "vision_glare",
+    "relevant_memory_ids": [
+      "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    ],
+    "source_manufacturer": "KEYENCE",
+    "source_document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+    "label_method": "source_grounded",
+    "notes": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+  }
+]

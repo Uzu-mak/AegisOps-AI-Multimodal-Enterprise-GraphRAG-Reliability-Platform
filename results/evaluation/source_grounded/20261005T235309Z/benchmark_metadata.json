@@ -1,0 +1,26 @@
+{
+  "dataset": "source-grounded",
+  "timestamp": "20261005T235309Z",
+  "commit": "unknown",
+  "query_dataset": "data/evaluation/source_grounded_queries.json",
+  "query_dataset_sha256": "1e862317432753b9b4afc3ca1967edbb80dec76c4c9e47c73e3ab28da631e6bb",
+  "query_count": 60,
+  "source_memory_count": 6,
+  "relevant_memory_count": 6,
+  "fault_family_count": 6,
+  "retriever_configs": {
+    "top_k": 10,
+    "fusion_constant_k": 60,
+    "embedding_model": "DeterministicFakeEmbedding(dimension=128)",
+    "latency_includes_query_embedding": true,
+    "warmup_runs": 1,
+    "repeats_per_query": 5
+  },
+  "service_versions": {
+    "python": "3.12.14",
+    "postgres": "postgres:16-alpine",
+    "qdrant": "qdrant/qdrant:latest",
+    "neo4j": "neo4j:5.26-community"
+  },
+  "disclaimer": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+}

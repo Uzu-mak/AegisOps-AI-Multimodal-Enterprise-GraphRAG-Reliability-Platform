@@ -1,0 +1,59 @@
+{
+  "source": {
+    "manufacturer": "KEYENCE",
+    "document": "Vision Sensor with Built-in AI IV4 Series",
+    "source_url": "https://www.keyence.com/products/vision/vision-sensor/iv4/",
+    "sections": [
+      "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+      "Background Removal and Extraction of Only the Detection Target",
+      "Easy Installation"
+    ]
+  },
+  "records": [
+    {
+      "record_key": "keyence-background-false-detection",
+      "fault_family": "vision_false_detection",
+      "source_section": "Background Removal and Extraction of Only the Detection Target",
+      "evidence": "KEYENCE states that background noise or other surrounding elements can cause false detections, and describes AI Target Extraction as removing sources of false detection from the surroundings.",
+      "memory_id": "1db3b1c0-ebb7-4fde-966c-dc72ed026d8b"
+    },
+    {
+      "record_key": "keyence-suboptimal-detection-image",
+      "fault_family": "vision_image_quality",
+      "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+      "evidence": "KEYENCE says AI Imaging II tests over 10,000 conditions and extracts images in which key features stand out clearly to recommend optimal images for detection.",
+      "memory_id": "7343f77a-0e04-4ce5-9f74-2a291a349fe7"
+    },
+    {
+      "record_key": "keyence-ambient-change-detection",
+      "fault_family": "vision_environmental_variation",
+      "source_section": "AI-Based Imaging: Delivering the Best Image Quality for Detection",
+      "evidence": "KEYENCE describes IV4 detection stability under environmental factors including slight changes in ambient lighting or surface finishes, and says AI helps configure optimal image settings.",
+      "memory_id": "d8b0dbf2-23a2-4f6e-a535-858249fd81f6"
+    },
+    {
+      "record_key": "keyence-target-variation",
+      "fault_family": "vision_target_variation",
+      "source_section": "Extensive Detection Tools That Simplify Previously Difficult Detection Tasks / AI Identify",
+      "evidence": "KEYENCE states that registering a single image with AI Identify can ensure stable detection regardless of environmental changes or individual product variations.",
+      "memory_id": "231e8c4e-d4a5-47a7-8d3d-ad0c8bba4ddd"
+    },
+    {
+      "record_key": "keyence-target-position-deviation",
+      "fault_family": "vision_position_deviation",
+      "source_section": "Frequently Asked Questions About Vision Sensors / Is detection possible if the passing target is misaligned?",
+      "evidence": "KEYENCE explains that misaligned products can cause false detections with point-detection sensors, while vision sensors analyze target features to determine position and orientation.",
+      "memory_id": "0539ad70-b075-4d74-9a5a-c503ad7b11a5"
+    },
+    {
+      "record_key": "keyence-glare-false-detection",
+      "fault_family": "vision_glare",
+      "source_section": "Frequently Asked Questions About Vision Sensors / Is detection affected by glossy surfaces?",
+      "evidence": "KEYENCE describes false detections from glare on polished metal and states that IV4 automatic focus and brightness adjustment enable stable detection even when glare is present.",
+      "memory_id": "a9425b49-1eb8-4dbe-8bf3-cc7d49fd772c"
+    }
+  ],
+  "query_count": 60,
+  "memory_count": 6,
+  "disclaimer": "These metrics come from a source-grounded / weakly-supervised benchmark. Relevance labels were derived from manufacturer troubleshooting records rather than independently authored human judgments."
+}
