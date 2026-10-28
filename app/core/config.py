@@ -29,6 +29,16 @@ class Settings:
     NEO4J_PASSWORD: Final[str] = os.getenv("NEO4J_PASSWORD", "aegisops")
     NEO4J_DATABASE: Final[str] = os.getenv("NEO4J_DATABASE", "neo4j")
 
+    # Embeddings: "fake" (SHA-256 test vectors) or "hashed_terms" (lexical)
+    EMBEDDING_PROVIDER: Final[str] = os.getenv("EMBEDDING_PROVIDER", "fake")
+
+    # Projection-store connection behaviour (see app/core/connections.py)
+    PROJECTION_CONNECT_TIMEOUT_SECONDS: Final[float] = float(
+        os.getenv("PROJECTION_CONNECT_TIMEOUT_SECONDS", "2")
+    )
+    PROJECTION_RETRY_SECONDS: Final[float] = float(os.getenv("PROJECTION_RETRY_SECONDS", "15"))
+    OUTBOX_WORKER_POLL_SECONDS: Final[float] = float(os.getenv("OUTBOX_WORKER_POLL_SECONDS", "2.0"))
+
     # Kafka configuration
     KAFKA_BOOTSTRAP_SERVERS: Final[str] = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
     KAFKA_PROJECTION_TOPIC: Final[str] = os.getenv(

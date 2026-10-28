@@ -126,13 +126,31 @@ class HybridMemoryRetriever:
             key=lambda r: (r.semantic_score or -1.0),
             reverse=True,
         )
-        results = results[: query.final_limit]
 
-        # --- PostgreSQL hydration ---
+        # --- PostgreSQL hydration (canonical truth) ---
+        # Hydrate every candidate *before* truncating so that inactive
+        # records filtered out here do not shrink the final page.
         if results:
             records = self._hydrate_from_postgres([r.memory_id for r in results])
+            kept: list[RetrievalResult] = []
             for result in results:
-                result.canonical_record = records.get(result.memory_id)
+                record = records.get(result.memory_id)
+                # Unhydrated hits (e.g. hydration failure) are kept but carry no
+                # canonical content; GraphRAG context construction skips them.
+                if (
+                    record is not None
+                    and not query.include_inactive
+                    and str(record.status) != "active"
+                ):
+                    continue
+                result.canonical_record = record
+                kept.append(result)
+            results = kept
+
+        if not results and query.keyword_fallback and query.mode != "graph":
+            results = self._keyword_fallback(query)
+
+        results = results[: query.final_limit]
 
         elapsed_ms = (time.monotonic() - t0) * 1000
         logger.info(
@@ -140,6 +158,56 @@ class HybridMemoryRetriever:
             f"in {elapsed_ms:.1f}ms"
         )
         return results
+
+    def _keyword_fallback(self, query: RetrievalQuery) -> list[RetrievalResult]:
+        """
+        Bounded PostgreSQL keyword match used only when projections returned nothing.
+
+        Scores are the fraction of query terms found in title+content. This is
+        lexical matching, not semantic similarity, and is labelled as such
+        (retrieval_source="keyword").
+        """
+        terms = _query_terms(query.text)
+        if not terms:
+            return []
+        try:
+            from sqlalchemy import or_, select
+            from app.db.models.memory import MemoryRecord as MR
+
+            clauses = []
+            for t in terms:
+                pattern = f"%{_escape_like(t)}%"
+                clauses.append(MR.title.ilike(pattern, escape="\\"))
+                clauses.append(MR.content.ilike(pattern, escape="\\"))
+            stmt = select(MR).where(or_(*clauses))
+            if not query.include_inactive:
+                stmt = stmt.where(MR.status == "active")
+            stmt = stmt.order_by(MR.created_at.desc()).limit(200)
+            with self.session_factory() as session:
+                rows = session.scalars(stmt).all()
+                session.expunge_all()
+        except Exception as exc:
+            logger.error(f"PostgreSQL keyword fallback failed: {exc}")
+            return []
+
+        scored: list[RetrievalResult] = []
+        for rec in rows:
+            haystack = f"{rec.title or ''} {rec.content or ''}".lower()
+            hits = sum(1 for t in terms if t in haystack)
+            if not hits:
+                continue
+            scored.append(
+                RetrievalResult(
+                    memory_id=rec.id,
+                    retrieval_source="keyword",
+                    semantic_score=None,
+                    graph_path=None,
+                    keyword_score=round(hits / len(terms), 4),
+                    canonical_record=rec,
+                )
+            )
+        scored.sort(key=lambda r: (r.keyword_score or 0.0, float(r.canonical_record.importance or 0.0)), reverse=True)
+        return scored
 
     def _hydrate_from_postgres(
         self, memory_ids: list[UUID]
@@ -162,3 +230,26 @@ class HybridMemoryRetriever:
         except Exception as exc:
             logger.error(f"PostgreSQL hydration failed: {exc}")
             return {}
+
+
+_STOPWORDS = frozenset(
+    "a an and are as at be by did do does for from has have how in is it its of on or "
+    "the this that to was were what when where which who why with".split()
+)
+
+
+def _query_terms(text: str, max_terms: int = 8) -> list[str]:
+    import re
+
+    seen: list[str] = []
+    for tok in re.findall(r"[a-z0-9][a-z0-9_\-]*", (text or "").lower()):
+        if len(tok) < 2 or tok in _STOPWORDS or tok in seen:
+            continue
+        seen.append(tok)
+        if len(seen) >= max_terms:
+            break
+    return seen
+
+
+def _escape_like(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

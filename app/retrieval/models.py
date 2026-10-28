@@ -16,9 +16,10 @@ class RetrievalResult:
     """
 
     memory_id: UUID
-    retrieval_source: Literal["semantic", "graph", "hybrid"]
+    retrieval_source: Literal["semantic", "graph", "hybrid", "keyword"]
     semantic_score: Optional[float] = None
     graph_path: Optional[str] = None
+    keyword_score: Optional[float] = None
     canonical_record: Optional[object] = None  # MemoryRecord once hydrated
 
 
@@ -34,3 +35,9 @@ class RetrievalQuery:
     final_limit: int = 20
     graph_hops: int = 2
     filters: dict = field(default_factory=dict)
+    # Only ACTIVE canonical memories are returned unless this is set. Archived,
+    # disputed and superseded records must not silently become evidence.
+    include_inactive: bool = False
+    # When neither projection store produced candidates, fall back to a bounded
+    # PostgreSQL keyword match so PostgreSQL-only deployments still get evidence.
+    keyword_fallback: bool = False

@@ -158,13 +158,25 @@ class QdrantSemanticIndex(SemanticMemoryIndex):
             List of SemanticSearchResult
         """
         try:
-            # Search in Qdrant
-            search_results = self.client.search(
-                collection_name=self.collection_name,
-                query_vector=query_vector,
-                query_filter=filters,
-                limit=limit,
-            )
+            # qdrant-client >= 1.10 provides query_points(); search() was
+            # deprecated then removed in later releases. Prefer query_points
+            # on real clients so upgrading the client cannot silently disable
+            # semantic retrieval; fall back to search() for older clients.
+            if hasattr(type(self.client), "query_points"):
+                search_results = self.client.query_points(
+                    collection_name=self.collection_name,
+                    query=query_vector,
+                    query_filter=filters,
+                    limit=limit,
+                    with_payload=True,
+                ).points
+            else:
+                search_results = self.client.search(
+                    collection_name=self.collection_name,
+                    query_vector=query_vector,
+                    query_filter=filters,
+                    limit=limit,
+                )
 
             # Convert to SemanticSearchResult
             results = []

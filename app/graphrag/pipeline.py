@@ -89,6 +89,7 @@ class GraphRAGPipeline:
                 mode=self.retrieval_mode,
                 anchor_memory_id=anchor_id,
                 final_limit=self.context_limit,
+                keyword_fallback=True,
             )
             results = self.retriever.retrieve(query)
         except Exception as exc:
@@ -138,12 +139,16 @@ class GraphRAGPipeline:
             f"retrieval={retrieval_ms:.1f}ms generation={generation_ms:.1f}ms"
         )
 
+        effective_mode = self.retrieval_mode
+        if results and all(r.retrieval_source == "keyword" for r in results):
+            effective_mode = "keyword_fallback"
+
         return GraphRAGResponse(
             question=question,
             answer=answer,
             evidence=ctx.evidence_items,
             retrieval_results=results,
-            retrieval_mode=self.retrieval_mode,
+            retrieval_mode=effective_mode,
             model_name=model_name,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,

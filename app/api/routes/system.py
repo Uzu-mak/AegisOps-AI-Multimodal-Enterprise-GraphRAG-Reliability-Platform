@@ -32,29 +32,12 @@ def _collect_service_health() -> dict[str, dict[str, Any]]:
     except Exception as exc:
         health["postgres"] = {"status": "unhealthy", "error": str(exc)}
 
-    # Qdrant
-    try:
-        from qdrant_client import QdrantClient
+    # Qdrant / Neo4j — cached clients, short timeouts, fail fast during cool-down
+    from app.core.connections import get_connections
 
-        client = QdrantClient(settings.QDRANT_URL)
-        client.get_collections()
-        health["qdrant"] = {"status": "healthy", "url": settings.QDRANT_URL}
-    except Exception as exc:
-        health["qdrant"] = {"status": "unavailable", "error": str(exc)}
-
-    # Neo4j
-    try:
-        from neo4j import GraphDatabase
-
-        driver = GraphDatabase.driver(
-            settings.NEO4J_URI,
-            auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD),
-        )
-        driver.verify_connectivity()
-        driver.close()
-        health["neo4j"] = {"status": "healthy", "uri": settings.NEO4J_URI}
-    except Exception as exc:
-        health["neo4j"] = {"status": "unavailable", "error": str(exc)}
+    conns = get_connections()
+    health["qdrant"] = conns.probe("qdrant")
+    health["neo4j"] = conns.probe("neo4j")
 
     llm_health = llm_health_from_settings(settings)
     health["llm"] = {
@@ -65,6 +48,14 @@ def _collect_service_health() -> dict[str, dict[str, Any]]:
     }
     if llm_health.error:
         health["llm"]["error"] = llm_health.error
+    try:
+        from app.graphrag.providers import create_llm_provider
+
+        active_model = create_llm_provider(settings).get_model_name()
+    except Exception:  # noqa: BLE001
+        active_model = None
+    health["llm"]["active_model"] = active_model
+    health["llm"]["synthetic"] = bool(active_model and "deterministic-test" in active_model)
 
     return health
 
@@ -91,7 +82,18 @@ def _not_instrumented(detail: str = "Not instrumented") -> dict[str, Any]:
 def system_health() -> dict:
     """Check health of all AegisOps services."""
     health = _collect_service_health()
-    return {"status": _overall_status(health), "services": health}
+    from app.api.deps import get_embedding_provider
+
+    embedder = get_embedding_provider()
+    return {
+        "status": _overall_status(health),
+        "services": health,
+        "embedding_provider": {
+            "name": type(embedder).__name__,
+            "dimension": embedder.get_dimension(),
+            "semantic": False,  # neither bundled provider is a semantic model
+        },
+    }
 
 
 @router.get("/system/memory-stats")
@@ -422,7 +424,13 @@ def projection_metrics() -> dict[str, Any]:
     try:
         from kafka import KafkaAdminClient
 
-        admin = KafkaAdminClient(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS, client_id="aegisops-health")
+        timeout_ms = int(float(getattr(settings, "PROJECTION_CONNECT_TIMEOUT_SECONDS", 2)) * 1000)
+        admin = KafkaAdminClient(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            client_id="aegisops-health",
+            request_timeout_ms=max(timeout_ms, 1000),
+            api_version_auto_timeout_ms=max(timeout_ms, 1000),
+        )
         topic_meta = admin.describe_topics([settings.KAFKA_PROJECTION_TOPIC])[0]
         kafka_health = metric_value(status=MetricStatus.AVAILABLE, value="healthy")
         kafka_partitions = metric_value(
@@ -437,9 +445,11 @@ def projection_metrics() -> dict[str, Any]:
     qdrant_projected = _not_connected("Qdrant not connected")
     if services.get("qdrant", {}).get("status") in {"healthy", "degraded"}:
         try:
-            from qdrant_client import QdrantClient
+            from app.core.connections import get_connections
 
-            client = QdrantClient(settings.QDRANT_URL)
+            client = get_connections().qdrant_client()
+            if client is None:
+                raise RuntimeError("Qdrant not connected")
             count_res = client.count(collection_name=settings.QDRANT_COLLECTION_NAME, exact=True)
             qdrant_projected = metric_value(status=MetricStatus.AVAILABLE, value=int(count_res.count), unit="records")
         except Exception as exc:
@@ -449,16 +459,14 @@ def projection_metrics() -> dict[str, Any]:
     neo4j_relationships = _not_connected("Neo4j not connected")
     if services.get("neo4j", {}).get("status") in {"healthy", "degraded"}:
         try:
-            from neo4j import GraphDatabase
+            from app.core.connections import get_connections
 
-            driver = GraphDatabase.driver(
-                settings.NEO4J_URI,
-                auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD),
-            )
+            driver = get_connections().neo4j_driver()
+            if driver is None:
+                raise RuntimeError("Neo4j not connected")
             with driver.session(database=settings.NEO4J_DATABASE) as neo_session:
                 node_count = neo_session.run("MATCH (m:Memory) RETURN count(m) AS c").single()["c"]
                 rel_count = neo_session.run("MATCH ()-[r]->() RETURN count(r) AS c").single()["c"]
-            driver.close()
             neo4j_nodes = metric_value(status=MetricStatus.AVAILABLE, value=int(node_count), unit="nodes")
             neo4j_relationships = metric_value(status=MetricStatus.AVAILABLE, value=int(rel_count), unit="relationships")
         except Exception as exc:
@@ -486,7 +494,8 @@ def projection_metrics() -> dict[str, Any]:
             "consumer_lag": metric_value(
                 status=MetricStatus.NOT_CONNECTED,
                 value=None,
-                detail="Not applicable — consumers not implemented",
+                detail="Not applicable — Kafka consumers not implemented; projections are applied "
+                "from the PostgreSQL outbox by app.outbox.projection_worker",
             ),
         },
         "qdrant": {

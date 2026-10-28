@@ -43,6 +43,7 @@ class HybridRetrieveRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=50)
     graph_hops: int = Field(default=2, ge=1, le=5)
     anchor_memory_id: Optional[str] = None
+    include_inactive: bool = False
 
 
 class GraphRelatedRequest(BaseModel):
@@ -62,6 +63,7 @@ class RetrievalResultOut(BaseModel):
     retrieval_source: str
     semantic_score: Optional[float]
     graph_path: Optional[str]
+    keyword_score: Optional[float] = None
     memory_type: Optional[str]
     title: Optional[str]
     content_preview: Optional[str]
@@ -180,6 +182,7 @@ def hybrid_retrieve(
         anchor_memory_id=anchor_id,
         final_limit=request.limit,
         graph_hops=request.graph_hops,
+        include_inactive=request.include_inactive,
     )
     results = retriever.retrieve(query)
     latency_ms = (time.monotonic() - t0) * 1000
@@ -274,6 +277,7 @@ def graphrag_query(
                 "content_preview": e.content[:300],
                 "retrieval_source": e.retrieval_source,
                 "semantic_score": e.semantic_score,
+                "graph_path": e.graph_path,
                 "asset_id": e.asset_id,
                 "facility_id": e.facility_id,
                 "confidence": e.confidence,
@@ -298,6 +302,7 @@ def _format_results(results) -> list[RetrievalResultOut]:
                 retrieval_source=r.retrieval_source,
                 semantic_score=r.semantic_score,
                 graph_path=r.graph_path,
+                keyword_score=getattr(r, "keyword_score", None),
                 memory_type=str(rec.memory_type) if rec else None,
                 title=rec.title if rec else None,
                 content_preview=rec.content[:300] if rec else None,

@@ -13,10 +13,15 @@ from enum import Enum
 from importlib import import_module
 from typing import Any
 
+import logging
+import re
+
 from app.core.config import Settings
 from app.graphrag.provider import LLMMessage, LLMProvider, LLMProviderError, LLMResponse
 
 _MODEL_NAME = "deterministic-test-v1"
+_EVIDENCE_BLOCK = re.compile(r"^\[Memory \d+: ", re.MULTILINE)
+logger = logging.getLogger(__name__)
 
 
 class DeterministicTestProvider(LLMProvider):
@@ -42,7 +47,10 @@ class DeterministicTestProvider(LLMProvider):
         )
 
         # Count evidence items mentioned in context
-        evidence_count = system_msg.count("[Memory") + system_msg.count("Memory ID")
+        # Count real evidence blocks ("[Memory N: <uuid>]" at line start). The
+        # instruction text also mentions "[Memory N]", so a plain substring
+        # count over-reported one record when no evidence was retrieved.
+        evidence_count = len(_EVIDENCE_BLOCK.findall(system_msg))
 
         content = (
             f"[SYNTHETIC RESPONSE — deterministic-test-v1]\n\n"
@@ -185,18 +193,31 @@ class OpenAIProvider(LLMProvider):
 
 
 def create_llm_provider(settings: Settings) -> LLMProvider:
+
+    """
+    Build the configured provider.
+
+    Falls back to the clearly-labelled deterministic test provider when the
+    configured provider cannot be constructed (missing key, missing package,
+    unsupported name). The fallback is visible to clients: responses carry
+    ``is_synthetic_response=True`` and /system/health reports the
+    ``active_model`` actually in use alongside the configured one.
+    """
     provider_name = _normalize_provider_name(settings.LLM_PROVIDER)
 
     if provider_name == "openai" and settings.OPENAI_API_KEY:
-        return OpenAIProvider(
-            api_key=settings.OPENAI_API_KEY,
-            model=settings.LLM_MODEL,
-            timeout_seconds=settings.LLM_TIMEOUT_SECONDS,
-        )
+        try:
+            return OpenAIProvider(
+                api_key=settings.OPENAI_API_KEY,
+                model=settings.LLM_MODEL,
+                timeout_seconds=settings.LLM_TIMEOUT_SECONDS,
+            )
+        except LLMProviderError as exc:
+            logger.warning("OpenAI provider unavailable, using deterministic test provider: %s", exc)
+            return DeterministicTestProvider()
 
-    if provider_name == "test":
-        return DeterministicTestProvider()
-
+    if provider_name not in {"test", "openai"}:
+        logger.warning("Unsupported LLM_PROVIDER=%r, using deterministic test provider", provider_name)
     return DeterministicTestProvider()
 
 

@@ -14,18 +14,19 @@
 | Entity and relationship projection | Neo4j |
 | Durable projection events | PostgreSQL outbox and Kafka |
 | HTTP API and OpenAPI docs | FastAPI |
-| Operator experience | Streamlit UI |
+| Operator experience | Web console served by the API at `/console` |
+| Projection delivery | Outbox projection worker (PostgreSQL outbox to Qdrant and Neo4j) |
 | Evidence-grounded answering | GraphRAG pipeline with configured LLM provider |
 
 </details>
 
 ## Architecture
 
-PostgreSQL owns canonical memory content. Qdrant and Neo4j are derived retrieval projections; Kafka carries outbox events for projection consumers. A successful database commit is not rolled back when a best-effort index operation fails.
+PostgreSQL owns canonical memory content. Qdrant and Neo4j are derived retrieval projections. Every write commits the record and its outbox events in one transaction; the API then makes a best-effort synchronous projection, and the **projection worker** drains the outbox so that any projection missed while a store was down is applied once it returns. The outbox publisher also emits each event to Kafka for downstream consumers (no Kafka consumer group is part of this repository). A successful database commit is never rolled back when an index operation fails.
 
 ```mermaid
 flowchart LR
-    Operator[Operator or client] --> UI[Streamlit UI]
+    Operator[Operator or client] --> UI[Web console /console]
     Operator --> API[FastAPI]
     UI --> API
 
@@ -40,6 +41,9 @@ flowchart LR
     Service -. after commit .-> Graph[Graph projection service]
     Graph --> Neo4j[(Neo4j\ngraph projection)]
 
+    Outbox --> Worker[Projection worker]
+    Worker --> Qdrant
+    Worker --> Neo4j
     Outbox --> Publisher[Outbox publisher]
     Publisher --> Kafka[(Kafka\nprojection event topic)]
 ```
@@ -62,7 +66,7 @@ flowchart TD
     PG --> Response[Retrieval results]
 ```
 
-**Retrieval contract:** Qdrant and Neo4j return candidate memory IDs. PostgreSQL hydrates the canonical records returned by the API. In graph mode, supply an `anchor_memory_id` when the query does not otherwise provide an anchor.
+**Retrieval contract:** Qdrant and Neo4j return candidate memory IDs. PostgreSQL hydrates the canonical records returned by the API, and only `active` records are returned unless the request sets `include_inactive`, so archived, disputed and superseded memories never become answer evidence by accident. In graph mode, supply an `anchor_memory_id` when the query does not otherwise provide an anchor. When neither projection store returns candidates, GraphRAG falls back to a bounded PostgreSQL keyword match and reports `retrieval_mode: "keyword_fallback"`.
 
 ### Memory lifecycle
 
@@ -115,7 +119,7 @@ stateDiagram-v2
 
    - Swagger UI: <http://localhost:8000/docs>
    - ReDoc: <http://localhost:8000/redoc>
-   - Streamlit UI: <http://localhost:8501>
+   - Web console: <http://localhost:8000/console> (also the redirect target of `/`)
    - Qdrant dashboard: <http://localhost:6333/dashboard>
    - Neo4j Browser: <http://localhost:7474>
 
@@ -131,7 +135,30 @@ stateDiagram-v2
 | `neo4j` | Graph projection and traversal | `http://localhost:7474`, Bolt `localhost:7687` |
 | `kafka` | Projection event transport | `localhost:9092` |
 | `outbox-publisher` | Publishes committed outbox events to Kafka | Internal service |
-| `ui` | Streamlit operator interface | `http://localhost:8501` |
+| `projection-worker` | Applies pending outbox events to Qdrant and Neo4j with bounded retries | Internal service |
+| `ui` (profile `legacy-ui`) | Previous Streamlit interface, kept for reference | `docker compose --profile legacy-ui up ui`, then `http://localhost:8501` |
+
+## Web console
+
+The API serves an operator console at `/console`: plant overview with a live pipeline schematic, incidents as timelines, record management with lifecycle actions, evidence-cited answers, search, relationship graphs, a retrieval benchmark runner, and system health.
+
+![Plant overview showing the memory pipeline with Neo4j unavailable](docs/images/console-overview.png)
+
+Design follows ANSI/ISA-101 high-performance HMI practice: a calm grey display where colour is reserved for abnormal states, and every state also carries an icon and a word. It targets WCAG 2.2 AA: keyboard operation throughout (press `?` for shortcuts), visible focus, landmarks and a skip link, labelled forms with inline errors, reduced-motion support, light and dark displays, and a stacked layout on phones. It has no build step and no third-party runtime dependencies; fonts are bundled so it renders the same on networks without internet access. Sample data loaded from the console is flagged `is_synthetic` and labelled "Sample data".
+
+![Ask AegisOps answer with cited evidence, dark display](docs/images/console-ask-dark.png)
+
+## Reliability fixes (October 2026)
+
+| Problem | Effect | Fix |
+| --- | --- | --- |
+| Each request built new Qdrant and Neo4j clients, verified connectivity, re-ran Neo4j constraint bootstrap, and never closed the driver | With a store unreachable, **every** request (including PostgreSQL-only ones like listing memories) took about 35 s, beyond the UI's 10 s timeout, so pages failed to load | `app/core/connections.py`: one cached client per store, 2 s connect timeouts, a 15 s fail-fast window after a failure, one-time bootstrap, cleanup on shutdown. Measured locally: 35 s per request before; about 4 s once, then about 10 ms |
+| Outbox rows stayed `pending` forever; nothing applied them | Projections missed during an outage were never retried; backlog metrics only grew | `app/outbox/projection_worker.py` and the `projection-worker` service. Unreachable stores defer events without spending retries |
+| Hydration did not filter lifecycle status | Archived, disputed or superseded memories could be cited as evidence | Active-only by default; `include_inactive` to opt in |
+| Test LLM provider counted the prompt's own `[Memory N]` instruction as evidence | Reported "1 retrieved record" when none were retrieved | Counts real evidence blocks only |
+| `LLM_PROVIDER=openai` with a key but no `openai` package raised in a dependency | GraphRAG returned HTTP 500 | Falls back to the labelled test provider; health reports `active_model` and `synthetic` |
+| Qdrant search used `QdrantClient.search()`, removed in newer clients | Upgrading qdrant-client would silently return no semantic results | Uses `query_points()` when available |
+| Health and metrics endpoints opened fresh clients (and an unbounded Kafka admin probe) on every call | Slow health checks that themselves timed out | Reuse cached clients; bounded Kafka probe timeouts |
 
 ## API
 
@@ -310,6 +337,10 @@ Compose supplies service hostnames such as `postgres`, `qdrant`, and `neo4j` to 
 | `LLM_PROVIDER` | `test` in Compose | GraphRAG provider selection |
 | `LLM_MODEL` | configured model name | Model identifier for the configured provider |
 | `OPENAI_API_KEY` | unset | Provider credential when required |
+| `EMBEDDING_PROVIDER` | `fake` | `fake` (SHA-256 test vectors) or `hashed_terms` (lexical term hashing); re-project records after switching |
+| `PROJECTION_CONNECT_TIMEOUT_SECONDS` | `2` | Connect timeout for Qdrant, Neo4j and the Kafka health probe |
+| `PROJECTION_RETRY_SECONDS` | `15` | After a failed connect, requests skip that store for this long instead of waiting on it again |
+| `OUTBOX_WORKER_POLL_SECONDS` | `2.0` | Idle poll interval for the projection worker |
 
 ## Project map
 
@@ -320,7 +351,8 @@ Compose supplies service hostnames such as `postgres`, `qdrant`, and `neo4j` to 
 app/
   agents/          agent workflow, state, tools, and critic
   api/             FastAPI routes, schemas, dependencies, errors
-  core/            application configuration
+  console/static/  web console (HTML, CSS, JS, self-hosted OFL fonts; no build step)
+  core/            application configuration and cached projection-store connections
   db/              SQLAlchemy models, sessions, and base
   embeddings/      embedding provider and deterministic test provider
   evaluation/      application evaluation metrics and models
@@ -328,7 +360,7 @@ app/
   graphrag/        evidence context, answer pipeline, LLM providers
   memory/          candidate memory and promotion logic
   observability/   request, retrieval, and runtime metrics
-  outbox/          transactional projection events and Kafka publisher
+  outbox/          transactional projection events, Kafka publisher, projection worker
   repositories/    PostgreSQL persistence
   retrieval/       semantic, graph, and hybrid result assembly
   semantic/        Qdrant semantic index
@@ -339,7 +371,7 @@ data/evaluation/   source-grounded memory/query dataset and manifest
 results/evaluation/ timestamped source-grounded benchmark artifacts
 tests/             API, service, storage, graph, retrieval, and eval tests
 docs/design/       design notes and service contracts
-ui/                Streamlit operations interface
+ui/                legacy Streamlit interface (compose profile legacy-ui)
 alembic/           PostgreSQL schema migrations
 ```
 
