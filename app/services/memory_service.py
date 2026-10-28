@@ -462,6 +462,92 @@ class RealMemoryService:
 
         return (old_materialized, new_materialized)
 
+    # ------------------------------------------------------------ bulk import
+
+    def active_source_fingerprints(self, *, source_type: str, source_ids: list[str]) -> dict[str, tuple[UUID, str | None]]:
+        """
+        Active records from one source system, keyed "facility|source_id".
+
+        Returns (memory id, import fingerprint) so a re-import can tell new,
+        changed and unchanged rows apart without loading full records.
+        """
+        out: dict[str, tuple[UUID, str | None]] = {}
+        if not source_ids:
+            return out
+        with self.session_factory() as session:
+            for start in range(0, len(source_ids), 1000):
+                chunk = source_ids[start:start + 1000]
+                rows = session.execute(
+                    select(MemoryRecord.id, MemoryRecord.facility_id, MemoryRecord.source_id, MemoryRecord.memory_metadata)
+                    .where(
+                        MemoryRecord.source_type == source_type,
+                        MemoryRecord.status == MemoryStatus.ACTIVE.value,
+                        MemoryRecord.source_id.in_(chunk),
+                    )
+                ).all()
+                for mid, facility, source_id, meta in rows:
+                    fp = ((meta or {}).get("import") or {}).get("fingerprint")
+                    out[f"{facility or ''}|{source_id}"] = (mid, fp)
+        return out
+
+    def bulk_import(
+        self,
+        *,
+        creates: list[MemoryCreateData],
+        supersedes: list[tuple[UUID, MemoryCreateData]],
+    ) -> dict[str, int]:
+        """
+        Write a whole import in one PostgreSQL transaction (all or nothing).
+
+        Projection is not done inline: every new or superseded record gets its
+        outbox events in the same transaction and the projection worker
+        indexes them into Qdrant and Neo4j. A record that is no longer active
+        when the import runs (someone archived it meanwhile) aborts the import
+        with MemoryConflictError so nothing is half-applied.
+        """
+        for data in creates:
+            self._validate_create_data(data)
+        for _, data in supersedes:
+            self._validate_create_data(data)
+
+        with self.session_factory() as session:
+            records = [self._build_memory_from_data(data) for data in creates]
+            session.add_all(records)
+            session.flush()
+            now = datetime.now(timezone.utc)
+            for record in records:
+                # Brand-new ids have no prior outbox rows, so skip the
+                # idempotency lookups _enqueue_projection_events performs.
+                event_id = uuid4()
+                for projection_type in (ProjectionType.QDRANT.value, ProjectionType.NEO4J.value):
+                    session.add(ProjectionOutboxEvent(
+                        memory_id=record.id, projection_type=projection_type, operation="project",
+                        event_id=event_id, event_type=ProjectionEventType.MEMORY_CREATED.value,
+                        memory_version=1, schema_version=1, occurred_at=now,
+                        status=ProjectionStatus.PENDING.value,
+                    ))
+            for old_id, data in supersedes:
+                existing = self.repository.get_for_update(session, old_id)
+                if existing is None or existing.status != MemoryStatus.ACTIVE.value:
+                    session.rollback()
+                    raise MemoryConflictError(
+                        f"Record {old_id} changed while the import was running; nothing was imported. Run the import again.")
+                replacement = self._build_memory_from_data(data)
+                replacement.supersedes_memory_id = old_id
+                existing.status = MemoryStatus.SUPERSEDED.value
+                self.repository.create(session, replacement)
+                self.repository.update(session, existing)
+                self._enqueue_projection_events(
+                    session=session, memory_id=existing.id, operation="status_update",
+                    event_type=ProjectionEventType.MEMORY_SUPERSEDED,
+                )
+                self._enqueue_projection_events(
+                    session=session, memory_id=replacement.id, operation="project",
+                    event_type=ProjectionEventType.MEMORY_CREATED,
+                )
+            session.commit()
+        return {"created": len(creates), "superseded": len(supersedes)}
+
     def _transition_memory_status(
         self,
         memory_id: UUID,

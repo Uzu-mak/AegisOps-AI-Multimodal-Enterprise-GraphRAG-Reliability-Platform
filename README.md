@@ -145,6 +145,8 @@ The API serves an operator console at `/console`. Its pages are one operational 
 
 ```mermaid
 flowchart LR
+    W[Import work orders<br/>CMMS history] --> R[Records]
+    R --> V
     O[Plant overview<br/>what needs attention] --> I[Incidents<br/>timeline per incident]
     I --> V[Investigate<br/>cited answer + checks]
     S[Search] --> V
@@ -160,7 +162,8 @@ flowchart LR
 | --- | --- | --- | --- |
 | Plant overview | Open incidents, pipeline state, projection backlog. Every pipeline stage opens the page it powers | Incidents, Records, Investigate, System health | `/memories`, `/system/outbox-stats` |
 | Incidents | Everything recorded against one incident, in order; add to it | Investigate this incident, Relationships, asset records | `/memories` |
-| Records | Canonical records with lifecycle actions (dispute, archive, supersede) | Investigate from a record, Relationships, Incident | `/memories/*` |
+| Records | Canonical records with lifecycle actions (dispute, archive, supersede) | Investigate from a record, Relationships, Incident, Import | `/memories/*` |
+| Import work orders | Preview, map columns and load a CMMS work-order export; re-imports skip unchanged rows and supersede changed ones | Records (filtered to work orders), Investigate, System health | `/imports/work-orders` |
 | Investigate | One retrieval, graph links, a cited answer, a citation check, and how it was built. Starting from a record scopes the evidence to its incident or asset | Record finding (back to the incident), Add to benchmark, Search | `/investigations`, `/investigations/findings` |
 | Search | The three retrieval modes the benchmark measures | Investigate, Relationships | `/search/hybrid` |
 | Relationships | Records linked through asset, line, incident, source or supersession | Records, Incidents, Investigate | `/search/graph-related` |
@@ -174,6 +177,30 @@ Findings are human-confirmed: an investigation never writes a record by itself. 
 ![An investigation scoped to an incident, with cited evidence and the steps that built it](docs/images/console-investigation.png)
 
 Design follows ANSI/ISA-101 high-performance HMI practice: a calm grey display where colour is reserved for abnormal states, and every state also carries an icon and a word. It targets WCAG 2.2 AA: keyboard operation throughout (press `?` for shortcuts), visible focus, landmarks and a skip link, labelled forms with inline errors, reduced-motion support, light and dark displays, and a stacked layout on phones. It has no build step and no third-party runtime dependencies; fonts are bundled so it renders the same on networks without internet access. The sample plant (aerospace manufacturing: a drilling cell, an autoclave, an ultrasonic scanner) is invented, flagged `is_synthetic`, and labelled "Sample data".
+
+## Importing work-order history
+
+A pilot should run on the plant's own maintenance history, not sample data. AegisOps imports a work-order CSV exported from IBM Maximo, SAP PM or any CMMS that can write CSV, from the console (**Import work orders**) or the command line:
+
+```bash
+# Dry run: report what would be created, changed, skipped, and which rows have problems
+python -m app.ingestion.work_orders exports/workorders.csv --timezone America/Los_Angeles
+# Write it (one PostgreSQL transaction; the projection worker indexes the records)
+python -m app.ingestion.work_orders exports/workorders.csv --timezone America/Los_Angeles --apply
+# Columns with unusual names
+python -m app.ingestion.work_orders jobs.csv --map wo_number=Job --map description=What --apply
+```
+
+| Rule | Why |
+| --- | --- |
+| One work order becomes one `maintenance_action` record (`source_type=work_order`, `source_id` = the work-order number). Problem, cause and remedy codes go in the text and in `metadata.work_order` | Search and investigations can use failure codes; the original fields stay queryable |
+| Columns are detected by header name (Maximo `WONUM`, `ASSETNUM`, `ACTFINISH`...; SAP PM `Order`, `Equipment`, `Functional Location`...). Unrecognised columns are kept in `metadata.extra`; any mapping can be overridden | Exports differ between plants; nothing in the file is dropped silently |
+| Re-importing is idempotent: unchanged work orders are skipped, changed ones **supersede** the earlier version, which is kept | A weekly export can be loaded again without duplicates, and history stays auditable |
+| `incident_id` is set only from an originating ticket, service request or notification column. An incident counts as resolved when every work order against it is closed in the CMMS | AegisOps never invents incidents; records still connect through asset, location and site |
+| Bad rows are reported by row number and skipped; the rest import. Ambiguous dates follow the chosen order (month or day first) and plant time zone | One bad row should not block a 10,000-row history, and dates must be unambiguous |
+| The whole import is one transaction, and records are projected by the outbox worker rather than inline | All or nothing; a large import does not stall on Qdrant or Neo4j |
+
+`app/console/static/samples/work-orders-sample.csv` is a 30-row invented Maximo-style export (18 months across 8 assets, with repeat spindle-bearing and thermocouple-lead failures to investigate). Every work-order number starts with `SAMPLE-` and the console imports it flagged as synthetic.
 
 ## Reliability fixes (October 2026)
 
@@ -215,6 +242,7 @@ Feature routes are under `/api/v1`; the process health check is at `/health`. Th
 | `POST` | `/graphrag/query` | Retrieve evidence and generate an answer (no trace) |
 | `POST` | `/investigations` | Run an investigation: cited answer, evidence, steps and citation check |
 | `POST` | `/investigations/findings` | Record an operator-confirmed finding through the promotion policy |
+| `POST` | `/imports/work-orders` | Preview (`dry_run: true`, the default) or apply a CMMS work-order CSV import |
 | `POST` | `/evaluation/runs` | Recall@k and MRR per retrieval mode for labelled questions |
 | `GET` | `/system/health` | Check database, index, graph, and LLM health |
 | `GET` | `/system/memory-stats` | Count memories by type and status |
@@ -398,6 +426,7 @@ app/
   evaluation/      the single metrics module and the evaluation runner (API, console and CLI)
   graph/           Neo4j graph projection and traversal
   graphrag/        evidence context, answer pipeline, LLM providers
+  ingestion/       CMMS work-order CSV import (parser, mapping, idempotent planning, CLI)
   memory/          working memory, finding candidates and the promotion policy
   observability/   request, retrieval, and runtime metrics
   outbox/          transactional projection events, Kafka publisher, projection worker
