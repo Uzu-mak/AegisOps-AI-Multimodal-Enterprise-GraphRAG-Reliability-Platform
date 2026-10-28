@@ -200,6 +200,8 @@ python -m app.ingestion.work_orders jobs.csv --map wo_number=Job --map descripti
 | Bad rows are reported by row number and skipped; the rest import. Ambiguous dates follow the chosen order (month or day first) and plant time zone | One bad row should not block a 10,000-row history, and dates must be unambiguous |
 | The whole import is one transaction, and records are projected by the outbox worker rather than inline | All or nothing; a large import does not stall on Qdrant or Neo4j |
 
+![Import preview: counts, editable column mapping and how the first records will look](docs/images/console-import.png)
+
 `app/console/static/samples/work-orders-sample.csv` is a 30-row invented Maximo-style export (18 months across 8 assets, with repeat spindle-bearing and thermocouple-lead failures to investigate). Every work-order number starts with `SAMPLE-` and the console imports it flagged as synthetic.
 
 ## Reliability fixes (October 2026)
