@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -74,6 +76,8 @@ class InProcessMetricsCollector:
         self._graphrag_retrieval_samples: deque[MetricSample] = deque()
         self._graphrag_total_samples: deque[MetricSample] = deque()
         self._llm_samples: deque[LLMCallSample] = deque()
+        self._investigation_samples: deque[tuple[float, bool, float]] = deque()  # (ts, supported, latency_ms)
+        self._finding_samples: deque[tuple[float, bool]] = deque()  # (ts, accepted)
 
         self._inflight_requests = 0
         self._peak_inflight_requests = 0
@@ -277,6 +281,34 @@ class InProcessMetricsCollector:
             "graphrag_retrieval_p95_ms": percentile([s.value for s in graphrag_retrieval], 95),
             "graphrag_total_p50_ms": percentile([s.value for s in graphrag_total], 50),
             "graphrag_total_p95_ms": percentile([s.value for s in graphrag_total], 95),
+        }
+
+    def observe_investigation(self, latency_ms: float, supported: bool) -> None:
+        now = time.time()
+        with self._lock:
+            self._investigation_samples.append((now, bool(supported), float(latency_ms)))
+            while self._investigation_samples and now - self._investigation_samples[0][0] > self._retention_seconds:
+                self._investigation_samples.popleft()
+
+    def observe_finding(self, accepted: bool) -> None:
+        now = time.time()
+        with self._lock:
+            self._finding_samples.append((now, bool(accepted)))
+            while self._finding_samples and now - self._finding_samples[0][0] > self._retention_seconds:
+                self._finding_samples.popleft()
+
+    def investigation_snapshot(self, window_seconds: int = 900) -> dict[str, Any]:
+        cutoff = time.time() - window_seconds
+        with self._lock:
+            inv = [s for s in self._investigation_samples if s[0] >= cutoff]
+            fnd = [s for s in self._finding_samples if s[0] >= cutoff]
+        return {
+            "window_seconds": window_seconds,
+            "investigations": len(inv),
+            "supported_rate": (sum(1 for s in inv if s[1]) / len(inv)) if inv else None,
+            "latency_p50_ms": percentile([s[2] for s in inv], 50),
+            "findings_submitted": len(fnd),
+            "finding_acceptance_rate": (sum(1 for s in fnd if s[1]) / len(fnd)) if fnd else None,
         }
 
     def llm_snapshot(self, window_seconds: int = 900) -> dict[str, Any]:

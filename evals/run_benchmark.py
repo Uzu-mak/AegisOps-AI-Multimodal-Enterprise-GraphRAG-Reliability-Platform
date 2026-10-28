@@ -19,7 +19,7 @@ from app.db.models.memory import MemoryRecord
 from app.db.session import SessionLocal
 from app.embeddings.factory import create_embedding_provider
 from evals.metrics import mrr_at_k, percentile, recall_at_k
-from evals.retrievers import GraphRetriever, HybridRetriever, VectorRetriever
+from evals.retrievers import build_mode_retrievers
 from evals.source_grounded_pipeline import SOURCE_GROUNDED_COLLECTION
 from evals.validate_queries import validate_query_file
 
@@ -224,29 +224,20 @@ def _build_retrievers(semantic_collection: str | None = None, backend_status: di
         graph_index = None
         status["neo4j"] = f"unavailable: {type(exc).__name__}: {exc}"
 
-    prod_hybrid = None
-    if semantic_index is not None and graph_index is not None:
-        from app.retrieval.hybrid import HybridMemoryRetriever
+    from app.retrieval.hybrid import HybridMemoryRetriever
 
-        prod_hybrid = HybridMemoryRetriever(
-            semantic_index=semantic_index,
-            graph_index=graph_index,
-            embedding_provider=embedding_provider,
-            session_factory=SessionLocal,
-        )
-
+    production = HybridMemoryRetriever(
+        semantic_index=semantic_index,
+        graph_index=graph_index,
+        embedding_provider=embedding_provider,
+        session_factory=SessionLocal,
+    )
     # A method only exists when every backend it needs is reachable. Missing
     # methods are reported as unavailable, never as a recall of zero.
-    return {
-        "vector": VectorRetriever(semantic_index=semantic_index, embedding_provider=embedding_provider) if semantic_index else None,
-        "graph": GraphRetriever(graph_index=graph_index, semantic_index=semantic_index, embedding_provider=embedding_provider) if (graph_index and semantic_index) else None,
-        "hybrid": HybridRetriever(
-            semantic_index=semantic_index,
-            graph_index=graph_index,
-            embedding_provider=embedding_provider,
-            production_retriever=prod_hybrid,
-        ) if prod_hybrid else None,
-    }
+    return build_mode_retrievers(
+        production,
+        {"qdrant": semantic_index is not None, "neo4j": graph_index is not None},
+    )
 
 
 def _query_metadata(query: dict) -> tuple[str, str, set[str], str]:

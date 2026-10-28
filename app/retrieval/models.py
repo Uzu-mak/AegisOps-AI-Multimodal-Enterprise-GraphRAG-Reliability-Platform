@@ -16,7 +16,9 @@ class RetrievalResult:
     """
 
     memory_id: UUID
-    retrieval_source: Literal["semantic", "graph", "hybrid", "keyword"]
+    # anchor: the record the investigation started from; context: records sharing
+    # its incident or asset, read from PostgreSQL when the graph is unavailable.
+    retrieval_source: Literal["semantic", "graph", "hybrid", "keyword", "anchor", "context"]
     semantic_score: Optional[float] = None
     graph_path: Optional[str] = None
     keyword_score: Optional[float] = None

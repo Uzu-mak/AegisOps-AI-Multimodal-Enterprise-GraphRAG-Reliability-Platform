@@ -99,3 +99,21 @@ class TestEvaluationRunner:
 
         assert run.failed_cases == 1
         assert run.case_results[0].error is not None
+
+
+class TestPerModeAggregation:
+
+    def test_modes_are_aggregated_separately_and_retrieval_only_has_no_answer_metrics(self):
+        def fn(question, mode):
+            ids = ["id-1"] if mode == "semantic" else ["x", "id-1"]
+            return (None if mode == "semantic" else "Cited [Memory 1] answer sentence that is long enough."), ids, 1.0, 0.0
+
+        run = EvaluationRunner(retrieval_fn=fn).evaluate(
+            [EvalCase(case_id="c1", question="q", expected_memory_ids=["id-1"]),
+             EvalCase(case_id="c2", question="open question")],
+            modes=[RetrievalMode.SEMANTIC, RetrievalMode.AGENTIC], k=10)
+        sem, agent = run.per_mode["semantic"], run.per_mode["agentic"]
+        assert sem["labeled_cases"] == 1 and sem["mrr"] == 1.0
+        assert agent["mrr"] == 0.5
+        assert sem["groundedness"] is None
+        assert agent["groundedness"] == 1.0

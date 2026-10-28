@@ -42,22 +42,31 @@ class RulesBasedPromotion(PromotionPolicy):
         min_importance: float = 0.4,
         require_non_empty_content: bool = True,
         require_non_empty_title: bool = True,
+        require_evidence: bool = False,
     ) -> None:
         self.min_confidence = min_confidence
         self.min_importance = min_importance
         self.require_non_empty_content = require_non_empty_content
         self.require_non_empty_title = require_non_empty_title
+        self.require_evidence = require_evidence
+
+    def rejection_reasons(self, candidate: MemoryCandidate) -> list[str]:
+        """Why the candidate would be rejected; empty when it passes."""
+        reasons: list[str] = []
+        if self.require_non_empty_title and not candidate.title.strip():
+            reasons.append("Add a title.")
+        if self.require_non_empty_content and not candidate.content.strip():
+            reasons.append("Describe the finding.")
+        if candidate.confidence < self.min_confidence:
+            reasons.append(f"Confidence {candidate.confidence:.2f} is below the {self.min_confidence:.2f} needed to record a finding.")
+        if candidate.importance < self.min_importance:
+            reasons.append(f"Importance {candidate.importance:.2f} is below the {self.min_importance:.2f} needed to record a finding.")
+        if self.require_evidence and not candidate.evidence_memory_ids:
+            reasons.append("Link at least one evidence record.")
+        return reasons
 
     def should_promote(self, candidate: MemoryCandidate) -> bool:
-        if self.require_non_empty_content and not candidate.content.strip():
-            return False
-        if self.require_non_empty_title and not candidate.title.strip():
-            return False
-        if candidate.confidence < self.min_confidence:
-            return False
-        if candidate.importance < self.min_importance:
-            return False
-        return True
+        return not self.rejection_reasons(candidate)
 
     def build_create_data(self, candidate: MemoryCandidate) -> MemoryCreateData:
         return MemoryCreateData(

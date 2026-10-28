@@ -12,17 +12,20 @@
 | Canonical memory and lifecycle | PostgreSQL |
 | Semantic index | Qdrant |
 | Entity and relationship projection | Neo4j |
-| Durable projection events | PostgreSQL outbox and Kafka |
+| Durable projection events | PostgreSQL outbox (Kafka optional, for external consumers) |
 | HTTP API and OpenAPI docs | FastAPI |
 | Operator experience | Web console served by the API at `/console` |
 | Projection delivery | Outbox projection worker (PostgreSQL outbox to Qdrant and Neo4j) |
-| Evidence-grounded answering | GraphRAG pipeline with configured LLM provider |
+| Investigations | Retrieve once, follow graph links, cited answer, citation check, then an operator-confirmed finding |
+| Retrieval evaluation | One retriever and one metrics module shared by the API, console and recorded CLI benchmark |
 
 </details>
 
 ## Architecture
 
-PostgreSQL owns canonical memory content. Qdrant and Neo4j are derived retrieval projections. Every write commits the record and its outbox events in one transaction; the API then makes a best-effort synchronous projection, and the **projection worker** drains the outbox so that any projection missed while a store was down is applied once it returns. The outbox publisher also emits each event to Kafka for downstream consumers (no Kafka consumer group is part of this repository). A successful database commit is never rolled back when an index operation fails.
+PostgreSQL owns canonical memory content. Qdrant and Neo4j are derived retrieval projections. Every write commits the record and its outbox events in one transaction; the API then makes a best-effort synchronous projection, and the **projection worker** drains the outbox so that any projection missed while a store was down is applied once it returns. A successful database commit is never rolled back when an index operation fails.
+
+Kafka is optional. With the `integration` compose profile and `KAFKA_ENABLED=true`, the outbox publisher also emits every committed event to a Kafka topic for external systems such as a CMMS or MES. Nothing inside AegisOps consumes that topic, and nothing depends on it.
 
 ```mermaid
 flowchart LR
@@ -30,7 +33,7 @@ flowchart LR
     Operator --> API[FastAPI]
     UI --> API
 
-    API --> Routes[Memory, search, system routes]
+    API --> Routes[Memory, search, investigation, evaluation, system routes]
     Routes --> Service[Memory service]
     Service --> Repo[Memory repository]
     Repo --> PG[(PostgreSQL\ncanonical memories)]
@@ -44,8 +47,8 @@ flowchart LR
     Outbox --> Worker[Projection worker]
     Worker --> Qdrant
     Worker --> Neo4j
-    Outbox --> Publisher[Outbox publisher]
-    Publisher --> Kafka[(Kafka\nprojection event topic)]
+    Outbox -. optional .-> Publisher[Outbox publisher]
+    Publisher -. integration profile .-> Kafka[(Kafka\nfor external systems)]
 ```
 
 ### Retrieval path
@@ -133,20 +136,44 @@ stateDiagram-v2
 | `postgres` | Canonical memory database and projection outbox | `localhost:5432` |
 | `qdrant` | Vector index | `http://localhost:6333` |
 | `neo4j` | Graph projection and traversal | `http://localhost:7474`, Bolt `localhost:7687` |
-| `kafka` | Projection event transport | `localhost:9092` |
-| `outbox-publisher` | Publishes committed outbox events to Kafka | Internal service |
 | `projection-worker` | Applies pending outbox events to Qdrant and Neo4j with bounded retries | Internal service |
-| `ui` (profile `legacy-ui`) | Previous Streamlit interface, kept for reference | `docker compose --profile legacy-ui up ui`, then `http://localhost:8501` |
+| `kafka`, `kafka-init`, `outbox-publisher` (profile `integration`) | Optional outbound event stream for external systems | `docker compose --profile integration up -d`, then set `KAFKA_ENABLED=true` |
 
 ## Web console
 
-The API serves an operator console at `/console`: plant overview with a live pipeline schematic, incidents as timelines, record management with lifecycle actions, evidence-cited answers, search, relationship graphs, a retrieval benchmark runner, and system health.
+The API serves an operator console at `/console`. Its pages are one operational loop, and each page links to the next step:
+
+```mermaid
+flowchart LR
+    O[Plant overview<br/>what needs attention] --> I[Incidents<br/>timeline per incident]
+    I --> V[Investigate<br/>cited answer + checks]
+    S[Search] --> V
+    G[Relationships] --> V
+    V -- operator confirms --> F[Finding recorded<br/>on the incident]
+    F --> I
+    V -- operator labels evidence --> E[Evaluation<br/>recall@k, MRR]
+    E -- export queries.jsonl --> CLI[Recorded CLI benchmark]
+    H[System health<br/>what powers each page] -.-> O
+```
+
+| Page | Operational job | Leads to | API |
+| --- | --- | --- | --- |
+| Plant overview | Open incidents, pipeline state, projection backlog. Every pipeline stage opens the page it powers | Incidents, Records, Investigate, System health | `/memories`, `/system/outbox-stats` |
+| Incidents | Everything recorded against one incident, in order; add to it | Investigate this incident, Relationships, asset records | `/memories` |
+| Records | Canonical records with lifecycle actions (dispute, archive, supersede) | Investigate from a record, Relationships, Incident | `/memories/*` |
+| Investigate | One retrieval, graph links, a cited answer, a citation check, and how it was built. Starting from a record scopes the evidence to its incident or asset | Record finding (back to the incident), Add to benchmark, Search | `/investigations`, `/investigations/findings` |
+| Search | The three retrieval modes the benchmark measures | Investigate, Relationships | `/search/hybrid` |
+| Relationships | Records linked through asset, line, incident, source or supersession | Records, Incidents, Investigate | `/search/graph-related` |
+| Evaluation | Labelled questions, recall@k and MRR per mode, export for the recorded benchmark | Search, Investigate | `/evaluation/runs` |
+| System health | Each service, what it powers, projection backlog, investigation metrics | Every affected page | `/system/*` |
+
+Findings are human-confirmed: an investigation never writes a record by itself. **Record finding** goes through the same promotion policy as any promoted memory (confidence at least 0.6, importance at least 0.4, at least one evidence record). The finding stores its evidence IDs and question, and inherits the asset and incident of the record you started from. **Add to benchmark** never pre-ticks relevance; the operator labels which records a correct answer needs.
 
 ![Plant overview showing the memory pipeline with Neo4j unavailable](docs/images/console-overview.png)
 
-Design follows ANSI/ISA-101 high-performance HMI practice: a calm grey display where colour is reserved for abnormal states, and every state also carries an icon and a word. It targets WCAG 2.2 AA: keyboard operation throughout (press `?` for shortcuts), visible focus, landmarks and a skip link, labelled forms with inline errors, reduced-motion support, light and dark displays, and a stacked layout on phones. It has no build step and no third-party runtime dependencies; fonts are bundled so it renders the same on networks without internet access. Sample data loaded from the console is flagged `is_synthetic` and labelled "Sample data".
+![An investigation scoped to an incident, with cited evidence and the steps that built it](docs/images/console-investigation.png)
 
-![Ask AegisOps answer with cited evidence, dark display](docs/images/console-ask-dark.png)
+Design follows ANSI/ISA-101 high-performance HMI practice: a calm grey display where colour is reserved for abnormal states, and every state also carries an icon and a word. It targets WCAG 2.2 AA: keyboard operation throughout (press `?` for shortcuts), visible focus, landmarks and a skip link, labelled forms with inline errors, reduced-motion support, light and dark displays, and a stacked layout on phones. It has no build step and no third-party runtime dependencies; fonts are bundled so it renders the same on networks without internet access. The sample plant (aerospace manufacturing: a drilling cell, an autoclave, an ultrasonic scanner) is invented, flagged `is_synthetic`, and labelled "Sample data".
 
 ## Reliability fixes (October 2026)
 
@@ -159,6 +186,12 @@ Design follows ANSI/ISA-101 high-performance HMI practice: a calm grey display w
 | `LLM_PROVIDER=openai` with a key but no `openai` package raised in a dependency | GraphRAG returned HTTP 500 | Falls back to the labelled test provider; health reports `active_model` and `synthetic` |
 | Qdrant search used `QdrantClient.search()`, removed in newer clients | Upgrading qdrant-client would silently return no semantic results | Uses `query_points()` when available |
 | Health and metrics endpoints opened fresh clients (and an unbounded Kafka admin probe) on every call | Slow health checks that themselves timed out | Reuse cached clients; bounded Kafka probe timeouts |
+| The benchmark had its own retrieval adapters (no active-only filter; graph mode anchored differently from production) and three separate metric implementations | Recorded recall@k did not describe the retrieval users actually get | Benchmark methods are the production retriever in fixed modes; one metrics module (`app/evaluation/metrics.py`) used by API, console and CLI |
+| Graph neighbours came back in UUID order | Graph-mode ranking (MRR, recall@5) was effectively random | Linked records ranked by canonical importance, then recency |
+| Graph mode with a text query and no anchor returned nothing | Search "Relationships" mode was always empty | Anchors on the best vector match, the same definition the benchmark uses |
+| Projection hits for records PostgreSQL no longer has kept their top-k slot | Stale vectors pushed real evidence out of answers | Dropped at hydration; kept only if PostgreSQL itself can't be read |
+| The investigation agent, critic and memory-promotion modules were only reachable from tests, and the agent retrieved twice | Implemented reasoning loop unused by the product | `POST /investigations` (single retrieval, attributed graph step, critic) and `POST /investigations/findings` (promotion policy) |
+| Observability reported sensor and vision pipelines that don't exist | Eleven permanent "Not connected" rows | Removed; investigation and finding metrics added |
 
 ## API
 
@@ -179,11 +212,15 @@ Feature routes are under `/api/v1`; the process health check is at `/health`. Th
 | `POST` | `/search/semantic` | Search Qdrant and hydrate results from PostgreSQL |
 | `POST` | `/search/hybrid` | Run semantic, graph, or hybrid retrieval |
 | `POST` | `/search/graph-related` | Traverse graph relationships from a memory anchor |
-| `POST` | `/graphrag/query` | Retrieve evidence and generate an answer |
+| `POST` | `/graphrag/query` | Retrieve evidence and generate an answer (no trace) |
+| `POST` | `/investigations` | Run an investigation: cited answer, evidence, steps and citation check |
+| `POST` | `/investigations/findings` | Record an operator-confirmed finding through the promotion policy |
+| `POST` | `/evaluation/runs` | Recall@k and MRR per retrieval mode for labelled questions |
 | `GET` | `/system/health` | Check database, index, graph, and LLM health |
 | `GET` | `/system/memory-stats` | Count memories by type and status |
 | `GET` | `/system/outbox-stats` | Inspect projection outbox status |
 | `GET` | `/system/observability` | Read application/runtime metrics |
+| `GET` | `/system/projection-metrics` | Outbox backlog and Qdrant/Neo4j projection state |
 
 </details>
 
@@ -343,6 +380,7 @@ Compose supplies service hostnames such as `postgres`, `qdrant`, and `neo4j` to 
 | `PROJECTION_CONNECT_TIMEOUT_SECONDS` | `2` | Connect timeout for Qdrant, Neo4j and the Kafka health probe |
 | `PROJECTION_RETRY_SECONDS` | `15` | After a failed connect, requests skip that store for this long instead of waiting on it again |
 | `OUTBOX_WORKER_POLL_SECONDS` | `2.0` | Idle poll interval for the projection worker |
+| `KAFKA_ENABLED` | `false` | Turn on the optional outbound Kafka stream (with the `integration` compose profile) |
 
 ## Project map
 
@@ -351,16 +389,16 @@ Compose supplies service hostnames such as `postgres`, `qdrant`, and `neo4j` to 
 
 ```text
 app/
-  agents/          agent workflow, state, tools, and critic
   api/             FastAPI routes, schemas, dependencies, errors
+  agents/          investigation workflow and rule-based citation critic
   console/static/  web console (HTML, CSS, JS, self-hosted OFL fonts; no build step)
   core/            application configuration and cached projection-store connections
   db/              SQLAlchemy models, sessions, and base
   embeddings/      embedding provider and deterministic test provider
-  evaluation/      application evaluation metrics and models
+  evaluation/      the single metrics module and the evaluation runner (API, console and CLI)
   graph/           Neo4j graph projection and traversal
   graphrag/        evidence context, answer pipeline, LLM providers
-  memory/          candidate memory and promotion logic
+  memory/          working memory, finding candidates and the promotion policy
   observability/   request, retrieval, and runtime metrics
   outbox/          transactional projection events, Kafka publisher, projection worker
   repositories/    PostgreSQL persistence
@@ -373,7 +411,6 @@ data/evaluation/   source-grounded memory/query dataset and manifest
 results/evaluation/ timestamped source-grounded benchmark artifacts
 tests/             API, service, storage, graph, retrieval, and eval tests
 docs/design/       design notes and service contracts
-ui/                legacy Streamlit interface (compose profile legacy-ui)
 alembic/           PostgreSQL schema migrations
 ```
 

@@ -75,6 +75,7 @@ class RetrievalResultOut(BaseModel):
 
 
 class HybridRetrieveResponse(BaseModel):
+    anchor_memory_id: Optional[str] = None
     results: list[RetrievalResultOut]
     total: int
     mode: str
@@ -159,6 +160,14 @@ def hybrid_retrieve(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Graph retrieval mode is unavailable because Neo4j is unavailable",
         )
+    if request.mode == "graph" and semantic_index is None and not request.anchor_memory_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Graph retrieval needs a starting record: pass anchor_memory_id, "
+                "or bring Qdrant back so the best text match can be used as the anchor"
+            ),
+        )
     if request.mode == "hybrid" and semantic_index is None and graph_index is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -187,11 +196,13 @@ def hybrid_retrieve(
     results = retriever.retrieve(query)
     latency_ms = (time.monotonic() - t0) * 1000
     metrics_collector.observe_retrieval(request.mode, latency_ms)
+    used_anchor = getattr(retriever, "last_anchor_id", None)
     return HybridRetrieveResponse(
         results=_format_results(results),
         total=len(results),
         mode=request.mode,
         latency_ms=latency_ms,
+        anchor_memory_id=str(used_anchor) if used_anchor else None,
     )
 
 

@@ -74,11 +74,7 @@ class TestAgentWorkflow:
             llm_provider=DeterministicTestProvider(),
         )
 
-        workflow = AegisOpsWorkflow(
-            retrieval_tool=None,
-            graph_tool=None,
-            graphrag_pipeline=pipeline,
-        )
+        workflow = AegisOpsWorkflow(graphrag_pipeline=pipeline)
 
         trace, response = workflow.run("What caused the pump failure?")
         assert isinstance(trace, AgentTrace)
@@ -98,8 +94,36 @@ class TestAgentWorkflow:
             retriever=mock_retriever,
             llm_provider=DeterministicTestProvider(),
         )
-        workflow = AegisOpsWorkflow(
-            retrieval_tool=None, graph_tool=None, graphrag_pipeline=pipeline
-        )
+        workflow = AegisOpsWorkflow(graphrag_pipeline=pipeline)
         trace, _ = workflow.run("test task")
         assert trace.total_latency_ms > 0
+
+
+class TestWorkflowRetrievesOnce:
+
+    def test_synthesis_reuses_the_single_retrieval(self):
+        from types import SimpleNamespace
+        from app.agents.workflow import AegisOpsWorkflow
+        from app.graphrag.pipeline import GraphRAGPipeline
+        from app.graphrag.providers import DeterministicTestProvider
+        from app.retrieval.models import RetrievalResult
+
+        rec = SimpleNamespace(id=uuid4(), memory_type="diagnosis", title="Worn spindle bearing",
+                              content="Runout above limit.", asset_id="dc3", facility_id="b2",
+                              confidence=0.8, importance=0.7, status="active")
+        linked = SimpleNamespace(**{**rec.__dict__, "id": uuid4(), "title": "Bearing replaced"})
+        retriever = MagicMock()
+        retriever.graph_index = object()
+        retriever.last_anchor_id = rec.id
+        retriever.retrieve.return_value = [
+            RetrievalResult(memory_id=rec.id, retrieval_source="semantic", semantic_score=0.7, canonical_record=rec),
+            RetrievalResult(memory_id=linked.id, retrieval_source="graph", canonical_record=linked),
+        ]
+        workflow = AegisOpsWorkflow(graphrag_pipeline=GraphRAGPipeline(retriever=retriever, llm_provider=DeterministicTestProvider()))
+        trace, rag = workflow.run("Why are holes oversize?")
+
+        assert retriever.retrieve.call_count == 1
+        assert [s.step_type.value for s in trace.steps] == ["retrieval", "graph_reasoning", "synthesis", "critic"]
+        assert "1 record linked" in trace.steps[1].description
+        assert len(rag.evidence) == 2
+        assert trace.critic_result.is_supported is True  # extractive answer cites both records

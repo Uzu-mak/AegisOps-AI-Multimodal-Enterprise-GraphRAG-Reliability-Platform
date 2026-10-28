@@ -79,3 +79,23 @@ def test_keyword_fallback_is_opt_in():
 
 def test_query_terms_drop_stopwords_and_duplicates():
     assert _query_terms("Why is the R7 robot rejecting the R7 parts?") == ["r7", "robot", "rejecting", "parts"]
+
+
+def test_graph_mode_text_query_anchors_on_best_vector_match_and_ranks_links():
+    anchor = _record(title="anchor")
+    important = _record(importance=0.9)
+    minor = _record(importance=0.2)
+    graph = MagicMock()
+    graph.get_related_memory_ids.return_value = [minor.id, important.id]
+    retriever = HybridMemoryRetriever(
+        semantic_index=_semantic([(anchor.id, 0.8)]),
+        graph_index=graph,
+        embedding_provider=MagicMock(embed_text=MagicMock(return_value=[0.0])),
+        session_factory=_session_factory([anchor, important, minor]),
+    )
+    results = retriever.retrieve(RetrievalQuery(text="servo", mode="graph"))
+    graph.get_related_memory_ids.assert_called_once()
+    assert graph.get_related_memory_ids.call_args.args[0] == anchor.id
+    assert [r.memory_id for r in results] == [important.id, minor.id]  # anchor itself excluded
+    assert retriever.last_anchor_id == anchor.id
+    assert results[0].graph_path == f"linked_to:{anchor.id}"

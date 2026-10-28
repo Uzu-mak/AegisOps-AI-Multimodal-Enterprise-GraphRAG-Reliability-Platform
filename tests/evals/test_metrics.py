@@ -1,5 +1,5 @@
 from evals.metrics import mrr_at_k, percentile, recall_at_k
-from evals.retrievers import rrf_merge
+from evals.retrievers import ModeRetriever, build_mode_retrievers
 
 
 def test_recall_at_k_handles_top_k_overlap():
@@ -24,10 +24,26 @@ def test_percentile_is_order_statistic():
     assert percentile(values, 90) == 16.8
 
 
-def test_rrf_merge_prioritizes_overlap_and_rank_signal():
-    semantic = ["A", "B", "C"]
-    graph = ["B", "D"]
+def test_mode_retrievers_wrap_production_retriever_in_fixed_modes():
+    seen = []
 
-    merged = rrf_merge(semantic, graph, k=60)
-    assert merged[0] == "B"
-    assert merged[1:5] == ["A", "D", "C"]
+    class Production:
+        def retrieve(self, query):
+            seen.append((query.mode, query.final_limit))
+            return []
+
+    methods = build_mode_retrievers(Production(), {"qdrant": True, "neo4j": True})
+    for name in ("vector", "graph", "hybrid"):
+        methods[name].retrieve("servo fault", 10)
+    assert seen == [("semantic", 10), ("graph", 10), ("hybrid", 10)]
+
+
+def test_methods_needing_a_down_backend_are_absent():
+    methods = build_mode_retrievers(object(), {"qdrant": True, "neo4j": False})
+    assert isinstance(methods["vector"], ModeRetriever)
+    assert methods["graph"] is None and methods["hybrid"] is None
+
+
+def test_empty_relevant_set_is_vacuous_and_mrr_respects_k():
+    assert recall_at_k(["a"], [], k=5) == 1.0
+    assert mrr_at_k(["x", "y", "a"], {"a"}, k=2) == 0.0

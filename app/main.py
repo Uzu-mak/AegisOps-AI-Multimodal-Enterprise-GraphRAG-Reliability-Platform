@@ -12,6 +12,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.exception_handlers import register_exception_handlers
+from app.api.routes.evaluation import router as evaluation_router
+from app.api.routes.investigations import router as investigation_router
 from app.api.routes.memories import router as memory_router
 from app.api.routes.search import router as search_router
 from app.api.routes.system import router as system_router
@@ -39,6 +41,8 @@ app = FastAPI(
 )
 app.include_router(memory_router)
 app.include_router(search_router)
+app.include_router(investigation_router)
+app.include_router(evaluation_router)
 app.include_router(system_router)
 register_exception_handlers(app)
 
