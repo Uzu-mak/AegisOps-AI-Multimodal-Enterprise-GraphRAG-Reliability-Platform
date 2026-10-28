@@ -282,11 +282,18 @@ kbd {
 .service-strip { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; }
 .statusbar-time { font-size: var(--t-xs); color: var(--ink-3); white-space: nowrap; }
 
+/* Page layout: every view is a vertical stack with one gap size (24px).
+   Views never set their own margins; spacing comes only from these rules. */
 main {
   padding: var(--space-6);
   max-width: 1440px;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
+.stack { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.stack:empty { display: none; }
 main:focus, [tabindex="-1"]:focus { outline: none; }
 
 /* --------------------------------------------------------------- states */
@@ -321,7 +328,6 @@ main:focus, [tabindex="-1"]:focus { outline: none; }
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-5);
 }
 .page-head h1 {
   font-family: var(--font-readout);
@@ -346,19 +352,15 @@ main:focus, [tabindex="-1"]:focus { outline: none; }
 .panel-head h2 {
   font-size: var(--t-lg);
 }
+/* Inside a panel, consecutive blocks are 16px apart. */
+.panel > * + * { margin-top: var(--space-4); }
 .panel-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 .panel-head p { color: var(--ink-3); font-size: var(--t-sm); }
-.panel > h2 { margin-bottom: var(--space-4); }
-.panel + .panel,
-.grid + .panel,
-.panel + .grid,
-.grid + .grid { margin-top: var(--space-5); }
 
 .grid { display: grid; gap: var(--space-5); }
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -405,7 +407,6 @@ main:focus, [tabindex="-1"]:focus { outline: none; }
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
   background: var(--surface);
-  margin-top: var(--space-5);
 }
 .readout { padding: var(--space-4) var(--space-5); border-left: 1px solid var(--line); }
 .readout:first-child { border-left: 0; }
@@ -475,8 +476,10 @@ tbody tr.is-clickable:focus-visible { outline-offset: -3px; }
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
+.toolbar-note { align-self: center; color: var(--ink-2); font-size: var(--t-sm); }
+.page-actions.is-centered { justify-content: center; }
+.evidence .queue-meta { margin-top: var(--space-2); }
 .field { display: grid; gap: var(--space-1); min-width: 0; }
 .field > span, .field > label, legend { font-size: var(--t-sm); font-weight: 500; color: var(--ink-2); }
 .field small { color: var(--ink-3); font-size: var(--t-xs); }
@@ -565,7 +568,6 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .notice-crit svg { color: var(--crit); }
 .notice-info { border-left-color: var(--info); }
 .notice-info svg { color: var(--info); }
-.notice + * { margin-top: var(--space-4); }
 
 .empty {
   padding: var(--space-6) var(--space-5);
@@ -613,7 +615,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .evidence-head .btn-quiet { white-space: normal; text-align: left; min-height: 32px; padding-inline: 4px; font-weight: 700; }
 .evidence p { margin-top: var(--space-2); color: var(--ink-2); font-size: var(--t-sm); max-width: 80ch; }
 
-.latency { display: flex; flex-wrap: wrap; gap: var(--space-5); font-size: var(--t-sm); color: var(--ink-2); margin-top: var(--space-4); }
+.latency { display: flex; flex-wrap: wrap; gap: var(--space-5); font-size: var(--t-sm); color: var(--ink-2); }
 .latency strong { font: 600 var(--t-lg) var(--font-readout); color: var(--ink); margin-right: 3px; }
 
 .tag {
@@ -749,7 +751,7 @@ details.raw pre { overflow: auto; max-height: 420px; padding: var(--space-4); ba
 .shortcut-list { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-3) var(--space-5); margin: 0; }
 .shortcut-list dd { margin: 0; color: var(--ink-2); }
 
-.pager { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-top: var(--space-3); font-size: var(--t-sm); color: var(--ink-3); }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); font-size: var(--t-sm); color: var(--ink-3); }
 
 progress { width: 100%; height: 8px; accent-color: var(--accent); }
 
@@ -807,11 +809,6 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   body { background: #fff; }
 }
 
-/* Panels laid out by a grid take spacing from the grid gap, not sibling margins. */
-.grid > .panel,
-.grid > section,
-.grid > figure { margin-top: 0; }
-
 .pipeline-list { display: none; list-style: none; }
 .pipeline-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line); }
 .pipeline-list li:first-child { border-top: 0; padding-top: 0; }
@@ -821,3 +818,4 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 }
 .graph-canvas .gnode text,
 .schematic .pipe-label { paint-order: stroke; stroke: var(--surface); stroke-width: 5px; stroke-linejoin: round; }
+.stack > .pager { margin-top: calc(var(--space-3) - var(--space-5)); }

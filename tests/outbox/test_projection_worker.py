@@ -54,3 +54,25 @@ def test_neo4j_fn_projects_current_canonical_state(monkeypatch):
     _, neo4j_fn = build_projection_fns(conns, session_factory=MagicMock(), embedding_provider=MagicMock())
     neo4j_fn(str(memory.id), "status_update")
     graph_index.project_memory.assert_called_once_with(memory)
+
+
+def test_reproject_all_reports_unavailable_store_without_claiming_success(monkeypatch):
+    import app.outbox.projection_worker as pw
+
+    ids = [uuid4(), uuid4()]
+    session = MagicMock()
+    session.__enter__ = MagicMock(return_value=session)
+    session.__exit__ = MagicMock(return_value=None)
+    session.scalars.return_value.all.return_value = ids
+    memory = SimpleNamespace(id=ids[0], status="active", supersedes_memory_id=None)
+    monkeypatch.setattr(pw, "_load_memory", lambda _sf, _mid: memory)
+
+    semantic_service = MagicMock()
+    monkeypatch.setattr("app.services.semantic_service.SemanticIndexingService", lambda **_k: semantic_service)
+    conns = SimpleNamespace(semantic_index=lambda _e: object(), graph_index=lambda: None)
+
+    report = pw.reproject_all(conns, session_factory=MagicMock(return_value=session), embedding_provider=MagicMock())
+    assert report["records"] == 2
+    assert report["qdrant"]["projected"] == 2
+    assert report["neo4j"]["projected"] is None  # unavailable, not "0 done"
+    assert "Neo4j unavailable" in report["neo4j"]["errors"][0]

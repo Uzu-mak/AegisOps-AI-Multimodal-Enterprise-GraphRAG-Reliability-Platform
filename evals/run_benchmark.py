@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from app.core.config import get_settings
 from app.db.models.memory import MemoryRecord
 from app.db.session import SessionLocal
-from app.embeddings.fake import DeterministicFakeEmbedding
+from app.embeddings.factory import create_embedding_provider
 from evals.metrics import mrr_at_k, percentile, recall_at_k
 from evals.retrievers import GraphRetriever, HybridRetriever, VectorRetriever
 from evals.source_grounded_pipeline import SOURCE_GROUNDED_COLLECTION
@@ -165,9 +165,23 @@ def _service_versions() -> dict[str, str]:
     return versions
 
 
-def _build_retrievers(semantic_collection: str | None = None):
+def _embedding_label(provider) -> str:
+    return f"{type(provider).__name__}(dimension={provider.get_dimension()})"
+
+
+def _build_retrievers(semantic_collection: str | None = None, backend_status: dict | None = None):
+    """
+    Build the three retrievers against the live stack.
+
+    The embedding provider comes from EMBEDDING_PROVIDER, the same setting the
+    API and projection worker use, so query vectors match indexed vectors.
+    ``backend_status`` (if given) is filled with why a backend is unavailable.
+    """
     settings = get_settings()
-    embedding_provider = DeterministicFakeEmbedding()
+    status = backend_status if backend_status is not None else {}
+    embedding_provider = create_embedding_provider()
+    status["embedding_model"] = _embedding_label(embedding_provider)
+    timeout = float(getattr(settings, "PROJECTION_CONNECT_TIMEOUT_SECONDS", 2))
     qdrant_client = None
     QdrantSemanticIndex = None
     try:
@@ -175,10 +189,12 @@ def _build_retrievers(semantic_collection: str | None = None):
         from app.semantic.qdrant_impl import QdrantSemanticIndex as QdrantSemanticIndexImpl
 
         QdrantSemanticIndex = QdrantSemanticIndexImpl
-        qdrant_client = QdrantClient(settings.QDRANT_URL)
+        qdrant_client = QdrantClient(url=settings.QDRANT_URL, timeout=max(1, int(timeout)), check_compatibility=False)
         qdrant_client.get_collections()
-    except Exception:
+        status["qdrant"] = "available"
+    except Exception as exc:
         qdrant_client = None
+        status["qdrant"] = f"unavailable: {type(exc).__name__}: {exc}"
 
     semantic_index = None
     if qdrant_client is not None and QdrantSemanticIndex is not None:
@@ -195,32 +211,41 @@ def _build_retrievers(semantic_collection: str | None = None):
         from app.graph.neo4j_impl import Neo4jGraphMemoryIndex as Neo4jGraphMemoryIndexImpl
 
         Neo4jGraphMemoryIndex = Neo4jGraphMemoryIndexImpl
-        driver = GraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD))
+        driver = GraphDatabase.driver(
+            settings.NEO4J_URI,
+            auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD),
+            connection_timeout=timeout,
+        )
         driver.verify_connectivity()
         graph_index = Neo4jGraphMemoryIndex(driver=driver, database=settings.NEO4J_DATABASE)
         graph_index.bootstrap_constraints()
-    except Exception:
+        status["neo4j"] = "available"
+    except Exception as exc:
         graph_index = None
+        status["neo4j"] = f"unavailable: {type(exc).__name__}: {exc}"
 
     prod_hybrid = None
     if semantic_index is not None and graph_index is not None:
-        from app.api.deps import get_hybrid_retriever
+        from app.retrieval.hybrid import HybridMemoryRetriever
 
-        prod_hybrid = get_hybrid_retriever(
+        prod_hybrid = HybridMemoryRetriever(
             semantic_index=semantic_index,
             graph_index=graph_index,
             embedding_provider=embedding_provider,
+            session_factory=SessionLocal,
         )
 
+    # A method only exists when every backend it needs is reachable. Missing
+    # methods are reported as unavailable, never as a recall of zero.
     return {
         "vector": VectorRetriever(semantic_index=semantic_index, embedding_provider=embedding_provider) if semantic_index else None,
-        "graph": GraphRetriever(graph_index=graph_index, semantic_index=semantic_index, embedding_provider=embedding_provider) if graph_index else None,
+        "graph": GraphRetriever(graph_index=graph_index, semantic_index=semantic_index, embedding_provider=embedding_provider) if (graph_index and semantic_index) else None,
         "hybrid": HybridRetriever(
             semantic_index=semantic_index,
             graph_index=graph_index,
             embedding_provider=embedding_provider,
             production_retriever=prod_hybrid,
-        ) if (semantic_index or graph_index) else None,
+        ) if prod_hybrid else None,
     }
 
 
@@ -251,12 +276,23 @@ def _latency_ms_for_retriever(retriever, query_text: str, k: int, warmup: int, r
     return timings, outputs[median_index]
 
 
+def _embedding_limitation(label: str) -> str:
+    if label.startswith("DeterministicFakeEmbedding"):
+        return ("- Embeddings: DeterministicFakeEmbedding is a SHA-256 test embedding, not semantic. "
+                "Vector and hybrid numbers validate retrieval plumbing only.")
+    if label.startswith("HashedTermEmbedding"):
+        return ("- Embeddings: HashedTermEmbedding is a lexical term-hashing embedding. Recall reflects shared "
+                "vocabulary between query and record, not semantic similarity.")
+    return f"- Embeddings: {label}."
+
+
 def run_benchmark(
     queries_path: Path,
     k: int = DEFAULT_K,
     repeats: int = DEFAULT_REPEATS,
     warmup: int = DEFAULT_WARMUP,
     dataset: str = "human-labeled",
+    allow_partial: bool = False,
 ) -> dict:
     source_grounded = dataset == "source-grounded"
     if source_grounded:
@@ -280,13 +316,24 @@ def run_benchmark(
     if not validated:
         raise ValueError("No labeled queries were found. Add at least one real query with non-empty relevant_memory_ids.")
 
+    backend_status: dict = {}
     retrievers = _build_retrievers(
         semantic_collection=SOURCE_GROUNDED_COLLECTION if source_grounded else None,
+        backend_status=backend_status,
     )
+    unavailable_methods = [name for name in ("vector", "graph", "hybrid") if retrievers.get(name) is None]
     if not any(retriever is not None for retriever in retrievers.values()):
-        raise RuntimeError("No AegisOps retrieval backends were available. Start the Docker Compose stack before benchmarking.")
-    if source_grounded and any(retrievers.get(name) is None for name in ("vector", "graph", "hybrid")):
-        raise RuntimeError("Source-grounded runs require all three retrieval backends: vector, graph, and hybrid.")
+        raise RuntimeError(
+            "No AegisOps retrieval backends were available "
+            f"(qdrant: {backend_status.get('qdrant')}; neo4j: {backend_status.get('neo4j')}). "
+            "Start the Docker Compose stack before benchmarking."
+        )
+    if unavailable_methods and (source_grounded or not allow_partial):
+        raise RuntimeError(
+            f"Retrieval methods unavailable: {', '.join(unavailable_methods)} "
+            f"(qdrant: {backend_status.get('qdrant')}; neo4j: {backend_status.get('neo4j')}). "
+            "Start every backend, or pass --allow-partial to benchmark only the available methods."
+        )
 
     method_scores: dict[str, list[float]] = defaultdict(list)
     method_recall5: dict[str, list[float]] = defaultdict(list)
@@ -316,8 +363,7 @@ def run_benchmark(
         for method_name in ("vector", "graph", "hybrid"):
             retriever = retrievers.get(method_name)
             if retriever is None:
-                method_results = {"recall@5": 0.0, "recall@10": 0.0, "mrr@10": 0.0, "latency_ms": 0.0, "candidate_ids": []}
-                query_row["method_results"][method_name] = method_results
+                query_row["method_results"][method_name] = {"status": "unavailable"}
                 continue
 
             timings, candidate_ids = _latency_ms_for_retriever(retriever, query["query_text"], k, warmup, repeats)
@@ -367,7 +413,11 @@ def run_benchmark(
 
     method_summary = {}
     for method_name in ("vector", "graph", "hybrid"):
+        if method_name in unavailable_methods:
+            method_summary[method_name] = {"status": "unavailable"}
+            continue
         method_summary[method_name] = {
+            "status": "measured",
             "Recall@5": round(sum(method_recall5[method_name]) / len(method_recall5[method_name]), 6) if method_recall5[method_name] else 0.0,
             "Recall@10": round(sum(method_recall10[method_name]) / len(method_recall10[method_name]), 6) if method_recall10[method_name] else 0.0,
             "MRR": round(sum(method_mrr[method_name]) / len(method_mrr[method_name]), 6) if method_mrr[method_name] else 0.0,
@@ -389,6 +439,9 @@ def run_benchmark(
     for family_name, methods in sorted(query_count_by_method_family.items()):
         family_summary = {}
         for method_name in ("vector", "graph", "hybrid"):
+            if method_name in unavailable_methods:
+                family_summary[method_name] = {"status": "unavailable"}
+                continue
             values = methods.get(method_name, [])
             family_summary[method_name] = {
                 "Recall@5": round(sum(item["recall5"] for item in values) / len(values), 6) if values else 0.0,
@@ -411,12 +464,14 @@ def run_benchmark(
         "retriever_configs": {
             "top_k": k,
             "fusion_constant_k": 60,
-            "embedding_model": "DeterministicFakeEmbedding(dimension=128)",
+            "embedding_model": backend_status.get("embedding_model"),
             "latency_includes_query_embedding": True,
             "warmup_runs": warmup,
             "repeats_per_query": repeats,
         },
         "service_versions": _service_versions(),
+        "backend_status": backend_status,
+        "unavailable_methods": unavailable_methods,
         "summary_by_method": method_summary,
         "query_rows": query_rows,
         "zero_result_queries": zero_result_queries,
@@ -492,6 +547,7 @@ def run_benchmark(
         "# AegisOps retrieval evaluation",
         *([f"> **{SOURCE_GROUNDED_DISCLAIMER}**", ""] if source_grounded else []),
         f"Corpus size: {_memory_count()} memories | Query count: {len(validated)}",
+        f"Embedding: {backend_status.get('embedding_model')}",
         "",
         "Latency is measured per-query with a warm-up pass discarded, then median latency over repeated runs. Query embedding time is included for all methods, because the graph-only adapter chooses its anchor via the same semantic embedding path used in production.",
         "",
@@ -500,6 +556,9 @@ def run_benchmark(
     ]
     for method_name in ("vector", "graph", "hybrid"):
         values = method_summary[method_name]
+        if values.get("status") == "unavailable":
+            summary_lines.append(f"| {method_name} | not measured | not measured | not measured | — | — |")
+            continue
         summary_lines.append(
             f"| {method_name} | {values['Recall@5']:.4f} | {values['Recall@10']:.4f} | {values['MRR']:.4f} | {values['p50_latency_ms']:.3f} | {values['p95_latency_ms']:.3f} |"
         )
@@ -517,7 +576,9 @@ def run_benchmark(
         "## Limitations",
         "- Label quality: source-grounded labels are weak supervision from manufacturer documentation, not independently authored human judgments." if source_grounded else "- Label quality: relevance judgments are human-authored; no automatic labels are inferred from Qdrant or Neo4j outputs.",
         "- Sample size: the benchmark is limited to the number of labeled queries in the current file, which can be small.",
-        *(["- Source coverage: this seed corpus contains six records derived from one KEYENCE IV4 source page; the 60 queries are ten fixed-template variants per record, not 60 independent field incidents.", "- Embeddings: the current stack is configured with DeterministicFakeEmbedding, a hash-based test embedding that is not semantic. Vector and hybrid relevance numbers validate retrieval plumbing, not production semantic quality."] if source_grounded else []),
+        *(["- Source coverage: this seed corpus contains six records derived from one KEYENCE IV4 source page; the 60 queries are ten fixed-template variants per record, not 60 independent field incidents.", ] if source_grounded else []),
+        _embedding_limitation(backend_status.get("embedding_model") or ""),
+        *([f"- Not measured: {', '.join(unavailable_methods)} (backend unavailable during this run)."] if unavailable_methods else []),
         "- Single-machine latency: timings reflect the local Docker Compose host, not a distributed or production cluster.",
     ])
 
@@ -534,6 +595,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--k", type=int, default=DEFAULT_K, help="Top-k candidate list to evaluate.")
     parser.add_argument("--repeats", type=int, default=DEFAULT_REPEATS, help="Number of runs per query after warm-up.")
     parser.add_argument("--warmup", type=int, default=DEFAULT_WARMUP, help="Warm-up passes to discard before measuring latency.")
+    parser.add_argument("--allow-partial", action="store_true", help="Benchmark only the methods whose backends are reachable; others are reported as not measured.")
     args = parser.parse_args(argv)
 
     queries_path = args.queries or (SOURCE_GROUNDED_QUERY_FILE if args.dataset == "source-grounded" else DEFAULT_QUERY_FILE)
@@ -547,7 +609,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        payload = run_benchmark(queries_path, k=args.k, repeats=max(1, args.repeats), warmup=max(0, args.warmup), dataset=args.dataset)
+        payload = run_benchmark(queries_path, k=args.k, repeats=max(1, args.repeats), warmup=max(0, args.warmup), dataset=args.dataset, allow_partial=args.allow_partial)
     except Exception as exc:
         print(f"BENCHMARK FAILED: {exc}", file=sys.stderr)
         return 1
@@ -559,10 +621,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Benchmark complete. Results written to {payload['results_dir']}.")
     if args.dataset == "source-grounded":
         print(SOURCE_GROUNDED_DISCLAIMER)
+    print(f"Embedding: {payload['retriever_configs']['embedding_model']}")
     print("| Method | Recall@5 | Recall@10 | MRR | p50 latency (ms) | p95 latency (ms) |")
     print("| --- | ---: | ---: | ---: | ---: | ---: |")
     for method_name in ("vector", "graph", "hybrid"):
         values = payload["summary_by_method"][method_name]
+        if values.get("status") == "unavailable":
+            print(f"| {method_name} | not measured | not measured | not measured | — | — |")
+            continue
         print(f"| {method_name} | {values['Recall@5']:.4f} | {values['Recall@10']:.4f} | {values['MRR']:.4f} | {values['p50_latency_ms']:.3f} | {values['p95_latency_ms']:.3f} |")
     return 0
 

@@ -109,7 +109,10 @@ function notice(kind, title, body, actions) {
 }
 
 function empty(title, body, actions) {
-  return h("div", { class: "empty" }, h("h3", null, title), h("p", null, body), actions || null);
+  const acts = actions && !(actions instanceof Element && actions.classList.contains("page-actions"))
+    ? h("div", { class: "page-actions is-centered" }, actions)
+    : actions;
+  return h("div", { class: "empty" }, h("h3", null, title), h("p", null, body), acts || null);
 }
 
 function skeleton() {
@@ -509,11 +512,11 @@ async function viewOverview() {
   );
 
   if (!items.length) {
-    add(main, h("div", { class: "panel", style: "margin-top:24px" }, empty("No operational records yet",
+    add(main, empty("No operational records yet",
       "Record an incident or observation, or load a small labelled sample plant to explore the console.",
-      h("div", { class: "page-actions", style: "justify-content:center" },
+      h("div", { class: "page-actions is-centered" },
         h("button", { class: "btn btn-primary", type: "button", onclick: (e) => loadSampleData(e.currentTarget) }, "Load sample plant data"),
-        h("button", { class: "btn", type: "button", onclick: () => memoryForm({ onSaved: render }) }, "Record an event")))));
+        h("button", { class: "btn", type: "button", onclick: () => memoryForm({ onSaved: render }) }, "Record an event"))));
     return;
   }
 
@@ -522,7 +525,7 @@ async function viewOverview() {
   const recent = [...items].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 6);
 
   add(main, 
-    h("div", { class: "grid grid-main", style: "margin-top:24px" },
+    h("div", { class: "grid grid-main" },
       h("section", { class: "panel", "aria-labelledby": "q-title" },
         h("div", { class: "panel-head" }, h("h2", { id: "q-title" }, "Incident queue"), h("p", null, "Highest importance first")),
         openIncidents.length
@@ -747,8 +750,8 @@ async function viewMemories(params) {
     select("facility_id", "Facility", distinct("facility_id").map((v) => [v, v]), filters.facility_id),
   );
 
-  const tableHost = h("div");
-  add(main, toolbar, tableHost);
+  const tableHost = h("div", { class: "stack" });
+  add(main, h("div", { class: "panel" }, toolbar), tableHost);
 
   const draw = () => {
     const q = filters.q.toLowerCase();
@@ -817,7 +820,7 @@ async function viewAsk(params) {
   const anchor = params.get("anchor") || "";
   const q = params.get("q") || "";
   const svc = services();
-  const out = h("div", { "aria-live": "polite" });
+  const out = h("div", { class: "stack", "aria-live": "polite" });
 
   const question = h("textarea", { id: "ask-q", name: "question", rows: 3, required: true, placeholder: "e.g. Why does Robot R-17 keep faulting, and what fixed it last time?" }, q);
   const limit = h("select", { id: "ask-limit" }, [3, 5, 8, 10].map((n) => h("option", { value: n, selected: n === 5 }, `${n} records`)));
@@ -829,16 +832,16 @@ async function viewAsk(params) {
     if (!text) { question.setAttribute("aria-invalid", "true"); question.focus(); return; }
     question.removeAttribute("aria-invalid");
     busy(askBtn, true);
-    put(out, h("div", { class: "panel", style: "margin-top:24px" }, skeleton()));
+    put(out, h("div", { class: "panel" }, skeleton()));
     const r = await api("/graphrag/query", { method: "POST", timeout: 60000, body: { question: text, context_limit: Number(limit.value), anchor_memory_id: anchor || null } });
     busy(askBtn, false);
     if (!r.ok) return put(out, notice("crit", "No answer", r.error));
     put(out, renderAnswer(r.data));
   } },
     h("div", { class: "field" }, h("label", { for: "ask-q" }, "Your question"), question),
-    h("div", { class: "toolbar", style: "margin:16px 0 0" },
+    h("div", { class: "toolbar" },
       h("div", { class: "field" }, h("label", { for: "ask-limit" }, "Use up to"), limit),
-      anchor ? h("p", { class: "field-grow", style: "align-self:center" }, "Starting from record ", h("code", null, shortId(anchor)), " ", h("a", { href: "#/ask" }, "Clear")) : h("span", { class: "field-grow" }),
+      anchor ? h("p", { class: "field-grow toolbar-note" }, "Starting from record ", h("code", null, shortId(anchor)), " ", h("a", { href: "#/ask" }, "Clear")) : h("span", { class: "field-grow" }),
       askBtn),
   );
 
@@ -873,7 +876,7 @@ function renderAnswer(d) {
     ? notice("warn", "Matched by keywords", "Vector and graph stores didn't return candidates, so these records were matched by words in PostgreSQL. Treat the ranking as approximate.")
     : null;
 
-  return h("div", { class: "grid grid-main", style: "margin-top:24px" },
+  return h("div", { class: "grid grid-main" },
     h("section", { class: "panel", "aria-labelledby": "ans-title" },
       h("div", { class: "panel-head" }, h("h2", { id: "ans-title" }, "Answer"), d.is_synthetic_response ? stateChip("Test provider", "info") : h("span", { class: "tag" }, d.model_name)),
       modeNote,
@@ -891,7 +894,7 @@ function renderAnswer(d) {
               h("span", { class: "evidence-n" }, `Record ${i + 1}`),
               h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(e.memory_id) }, e.title)),
             h("p", null, e.content_preview),
-            h("div", { class: "queue-meta", style: "margin-top:8px" },
+            h("div", { class: "queue-meta" },
               h("span", { class: "tag" }, typeLabel(e.memory_type)),
               h("span", { class: "tag" }, SOURCE_LABEL[e.retrieval_source] || e.retrieval_source),
               metaPair("Asset", e.asset_id), metaPair("Confidence", pct(e.confidence))))))
@@ -904,7 +907,7 @@ function renderAnswer(d) {
 
 async function viewSearch(params) {
   const mode = params.get("mode") || "hybrid";
-  const out = h("div", { "aria-live": "polite" });
+  const out = h("div", { class: "stack", "aria-live": "polite" });
   const query = h("input", { type: "search", id: "s-q", name: "query", value: params.get("q") || "", placeholder: "Describe a symptom, part or fix", required: true });
   const modes = [["semantic", "Meaning"], ["graph", "Relationships"], ["hybrid", "Both"]];
   const seg = h("fieldset", null, h("legend", null, "Match by"),
@@ -928,7 +931,7 @@ async function viewSearch(params) {
     }
     const res = r.data.results || [];
     put(out, res.length
-      ? h("div", { class: "table-wrap", style: "margin-top:24px" }, h("table", null,
+      ? h("div", { class: "table-wrap" }, h("table", null,
           h("caption", null, `${res.length} result${res.length === 1 ? "" : "s"} in ${num(r.data.latency_ms, 0)} ms`),
           h("thead", null, h("tr", null, ["Record", "Found by", "Similarity", "Status", "Asset"].map((c) => h("th", { scope: "col" }, c)))),
           h("tbody", null, res.map((x) => {
@@ -940,9 +943,9 @@ async function viewSearch(params) {
               h("td", null, x.status ? lifecycleChip(x.status) : "—"),
               h("td", null, x.asset_id || "—"));
           }))))
-      : h("div", { style: "margin-top:24px" }, empty("No matches", "Try different words, switch to Both, or include archived records.")));
+      : h("div", null, empty("No matches", "Try different words, switch to Both, or include archived records.")));
   } },
-    h("div", { class: "toolbar", style: "margin:0" },
+    h("div", { class: "toolbar" },
       h("div", { class: "field field-grow" }, h("label", { for: "s-q" }, "Search for"), query),
       seg, inactive, go));
 
@@ -985,7 +988,7 @@ async function viewGraph(params) {
 
   const picker = h("select", { id: "g-anchor" }, items.slice().sort((a, b) => a.title.localeCompare(b.title)).map((m) => h("option", { value: m.id, selected: m.id === anchorId }, `${m.title} (${typeLabel(m.memory_type)})`)));
   const hops = h("select", { id: "g-hops" }, [1, 2, 3].map((n) => h("option", { value: n, selected: n === Number(params.get("hops") || 2) }, `${n} step${n > 1 ? "s" : ""}`)));
-  const out = h("div", { "aria-live": "polite", style: "margin-top:24px" });
+  const out = h("div", { class: "stack", "aria-live": "polite" });
 
   const run = async () => {
     history.replaceState(null, "", `#/graph?anchor=${picker.value}&hops=${hops.value}`);
@@ -999,10 +1002,11 @@ async function viewGraph(params) {
     put(out, drawGraph(byId.get(picker.value), related));
   };
 
-  const form = h("form", { class: "panel toolbar", onsubmit: (e) => { e.preventDefault(); run(); } },
-    h("div", { class: "field field-grow" }, h("label", { for: "g-anchor" }, "Start from"), picker),
-    h("div", { class: "field" }, h("label", { for: "g-hops" }, "Reach"), hops),
-    h("button", { class: "btn btn-primary", type: "submit" }, "Show links"));
+  const form = h("form", { class: "panel", onsubmit: (e) => { e.preventDefault(); run(); } },
+    h("div", { class: "toolbar" },
+      h("div", { class: "field field-grow" }, h("label", { for: "g-anchor" }, "Start from"), picker),
+      h("div", { class: "field" }, h("label", { for: "g-hops" }, "Reach"), hops),
+      h("button", { class: "btn btn-primary", type: "submit" }, "Show links")));
 
   put(main, head, !capable("neo4j") ? notice("warn", "Relationship store is offline", "Neo4j is unavailable. Links appear once it reconnects and the projection worker catches up.") : null, form, out);
   if (capable("neo4j")) run();
@@ -1030,13 +1034,13 @@ function drawGraph(anchor, related) {
   for (const p of pos) svg.append(gnode(p.m, p.x, p.y, false));
   svg.append(gnode(anchor, cx, cy, true));
 
-  const table = h("div", { class: "table-wrap", style: "margin-top:16px" }, h("table", null,
+  const table = h("div", { class: "table-wrap" }, h("table", null,
     h("caption", null, "Linked records as a table"),
     h("thead", null, h("tr", null, ["Record", "Type", "Status", "Asset", "Incident"].map((c) => h("th", { scope: "col" }, c)))),
     h("tbody", null, related.map((m) => h("tr", null,
       h("td", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(m.id) }, m.title)),
       h("td", null, typeLabel(m.memory_type)), h("td", null, lifecycleChip(m.status)), h("td", null, m.asset_id || "—"), h("td", null, m.incident_id || "—"))))));
-  return h("div", null, svg, table);
+  return h("div", { class: "stack" }, svg, table);
 }
 
 /* -------------------------------------------------------- evaluation */
@@ -1061,8 +1065,8 @@ async function viewEvaluation() {
   const all = await fetchAllMemories({ status: "active" });
   const items = all.items || [];
 
-  const caseList = h("div");
-  const results = h("div", { "aria-live": "polite" });
+  const caseList = h("div", { class: "stack" });
+  const results = h("div", { class: "stack", "aria-live": "polite" });
   const q = h("input", { type: "text", id: "e-q", placeholder: "e.g. What fixed the Robot R-17 servo fault?" });
   const expected = h("select", { id: "e-exp", multiple: true, size: 5 }, items.map((m) => h("option", { value: m.id }, m.title)));
 
@@ -1080,7 +1084,7 @@ async function viewEvaluation() {
 
   const run = h("button", { class: "btn btn-primary", type: "button" }, "Run benchmark");
   const modeBoxes = h("fieldset", null, h("legend", null, "Compare"),
-    h("div", { class: "toolbar", style: "margin:0" }, [["semantic", "Meaning"], ["graph", "Relationships"], ["hybrid", "Both"]].map(([v, l]) =>
+    h("div", { class: "toolbar" }, [["semantic", "Meaning"], ["graph", "Relationships"], ["hybrid", "Both"]].map(([v, l]) =>
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "emode", value: v, checked: true }), l))));
 
   run.addEventListener("click", async () => {
@@ -1089,7 +1093,7 @@ async function viewEvaluation() {
     if (!modes.length) return toast("Choose at least one retrieval mode", true);
     busy(run, true);
     const prog = h("progress", { max: evalState.cases.length * (modes.length + 1), value: 0, "aria-label": "Benchmark progress" });
-    put(results, h("div", { class: "panel", style: "margin-top:24px" }, h("p", null, "Running benchmark"), prog));
+    put(results, h("div", { class: "panel" }, h("p", null, "Running benchmark"), prog));
     const rows = [], answers = [], unavailable = new Set();
     for (const c of evalState.cases) {
       for (const mode of modes) {
@@ -1119,7 +1123,7 @@ async function viewEvaluation() {
     const mean = (arr, k) => arr.reduce((a, b) => a + (b[k] || 0), 0) / arr.length;
     const synthetic = res.answers.some((a) => a.synthetic);
     put(results, 
-      h("div", { style: "margin-top:24px" },
+      h("div", { class: "stack" },
         res.unavailable.length ? notice("warn", "Some modes didn't run", res.unavailable.join(" ")) : null,
         Object.keys(byMode).length ? h("section", { class: "panel" },
           h("div", { class: "panel-head" }, h("h2", null, "Retrieval"), h("p", null, `Mean over ${evalState.cases.length} question${evalState.cases.length === 1 ? "" : "s"}`)),
@@ -1139,7 +1143,7 @@ async function viewEvaluation() {
             h("tbody", null, res.answers.map((a) => h("tr", null,
               h("td", null, a.question, a.mode === "keyword_fallback" ? h("span", { class: "cell-sub" }, "Keyword fallback") : null),
               h("td", { class: "num" }, pct(a.recall)), h("td", { class: "num" }, pct(a.grounded)), h("td", { class: "num" }, pct(a.cites)), h("td", { class: "num" }, `${num(a.ms, 0)} ms`))))))) : null,
-        h("p", { style: "margin-top:16px" }, h("button", { class: "btn", type: "button", onclick: () => {
+        h("p", null, h("button", { class: "btn", type: "button", onclick: () => {
           const blob = new Blob([JSON.stringify({ cases: evalState.cases, ...evalState.results }, null, 2)], { type: "application/json" });
           const a = h("a", { href: URL.createObjectURL(blob), download: `aegisops-benchmark-${Date.now()}.json` });
           document.body.append(a); a.click(); a.remove();
@@ -1160,12 +1164,12 @@ async function viewEvaluation() {
         q.value = ""; expected.selectedIndex = -1; drawCases(); q.focus();
       } },
         h("h2", null, "Add a question"),
-        h("div", { class: "field", style: "margin-top:16px" }, h("label", { for: "e-q" }, "Question"), q),
-        h("div", { class: "field", style: "margin-top:16px" }, h("label", { for: "e-exp" }, "Records a correct answer must use"), expected, h("small", null, "Hold Ctrl or ⌘ to choose several")),
-        h("button", { class: "btn", type: "submit", style: "margin-top:16px" }, "Add question")),
-      h("div", { class: "panel" }, h("h2", null, "Run"), h("div", { style: "margin:16px 0" }, modeBoxes), run),
+        h("div", { class: "field" }, h("label", { for: "e-q" }, "Question"), q),
+        h("div", { class: "field" }, h("label", { for: "e-exp" }, "Records a correct answer must use"), expected, h("small", null, "Hold Ctrl or ⌘ to choose several")),
+        h("div", null, h("button", { class: "btn", type: "submit" }, "Add question"))),
+      h("div", { class: "panel" }, h("h2", null, "Run"), modeBoxes, h("div", null, run)),
     ),
-    h("section", { style: "margin-top:24px" }, caseList),
+    h("section", { "aria-label": "Benchmark questions" }, caseList),
     results,
   );
   drawCases();
@@ -1235,7 +1239,7 @@ async function viewSystem() {
     pageHead("System health", "Service state, projection backlog and runtime measures. Unmeasured values are shown as such, never estimated."),
     svcTable,
     !proj.ok ? notice("crit", "Projection metrics unavailable", proj.error) : null,
-    h("div", { class: "grid grid-metrics", style: "margin-top:24px" },
+    h("div", { class: "grid grid-metrics" },
       P ? metricTable("Outbox and Kafka", P.kafka_outbox) : null,
       P ? metricTable("Qdrant projection", P.qdrant) : null,
       P ? metricTable("Neo4j projection", P.neo4j) : null,

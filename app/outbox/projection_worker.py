@@ -103,5 +103,59 @@ def run_forever(batch_size: int = 50) -> None:  # pragma: no cover - process loo
         connections.close_all()
 
 
-if __name__ == "__main__":  # pragma: no cover
+def reproject_all(
+    connections: ProjectionConnections,
+    session_factory: Callable = SessionLocal,
+    embedding_provider: Any = None,
+) -> dict[str, Any]:
+    """
+    Re-project every canonical record into Qdrant and Neo4j.
+
+    Use after changing EMBEDDING_PROVIDER (stored vectors must come from the
+    same provider as query vectors) or after restoring a projection store.
+    Stores that are unreachable are skipped and reported, not treated as done.
+    """
+    from sqlalchemy import select
+
+    qdrant_fn, neo4j_fn = build_projection_fns(connections, session_factory, embedding_provider)
+    with session_factory() as session:
+        ids = [str(i) for i in session.scalars(select(MemoryRecord.id)).all()]
+    report: dict[str, Any] = {"records": len(ids)}
+    for name, fn in (("qdrant", qdrant_fn), ("neo4j", neo4j_fn)):
+        done, errors = 0, []
+        for memory_id in ids:
+            try:
+                fn(memory_id, "project")
+                done += 1
+            except ProjectionStoreUnavailable as exc:
+                errors = [str(exc)]
+                done = None
+                break
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{memory_id}: {exc}")
+        report[name] = {"projected": done, "errors": errors[:5], "error_count": len(errors)}
+    return report
+
+
+def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description="AegisOps outbox projection worker")
+    parser.add_argument("--reproject-all", action="store_true",
+                        help="Re-project every record once (e.g. after changing EMBEDDING_PROVIDER) and exit.")
+    args = parser.parse_args(argv)
+    if args.reproject_all:
+        logging.basicConfig(level=logging.WARNING)
+        connections = get_connections()
+        try:
+            print(json.dumps(reproject_all(connections), indent=2))
+        finally:
+            connections.close_all()
+        return 0
     run_forever()
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

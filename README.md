@@ -242,6 +242,8 @@ docker compose exec -T api python -m pytest tests/evals/ -q
 
 ## Retrieval evaluation
 
+Before recording recall@k: set `EMBEDDING_PROVIDER` once, re-index with `python -m app.outbox.projection_worker --reproject-all`, and confirm Qdrant and Neo4j are healthy. The benchmark refuses to run with a missing backend unless you pass `--allow-partial`, in which case missing methods are reported as not measured rather than as zero. Details: [evals/README.md](evals/README.md).
+
 Two datasets are intentionally kept separate:
 
 - **Human-labeled gold standard:** `evals/queries.jsonl`. This file is never written by the source-grounded generator.
@@ -376,6 +378,16 @@ alembic/           PostgreSQL schema migrations
 ```
 
 </details>
+
+## Troubleshooting Neo4j locally
+
+The console shows Neo4j as **Unavailable** whenever the API can't open a Bolt connection; records are still saved and queued, and the projection worker catches up once Neo4j is reachable.
+
+1. `docker compose ps neo4j` should say `healthy`. Neo4j takes 30 to 60 seconds to start on first run, so wait for the health check.
+2. `docker compose logs neo4j | tail -50` shows the cause if it keeps restarting. Common ones: not enough memory for Docker (Neo4j needs about 1 GB free), or a password change. `NEO4J_AUTH` only applies when the data volume is first created, so if you changed `NEO4J_PASSWORD` later, either set it back or recreate the volume with `docker compose down -v` (this deletes all local data).
+3. The password must be at least 8 characters (Neo4j 5 rule); the default `aegisops` qualifies.
+4. Running the API outside Docker? Use `NEO4J_URI=bolt://localhost:7687`, not `bolt://neo4j:7687`.
+5. Live checks: `docker compose exec api pytest tests/integration/test_neo4j_health.py tests/graph -q`.
 
 ## Operations
 

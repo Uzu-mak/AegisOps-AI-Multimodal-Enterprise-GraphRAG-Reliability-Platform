@@ -77,11 +77,19 @@ docker compose up -d --build
 
 The harness is intended to run against the local Docker Compose stack with PostgreSQL, Qdrant, and Neo4j available.
 
+## Before you record recall@k
+
+1. **Pick the embedding once.** Set `EMBEDDING_PROVIDER` in `.env` (`fake` = SHA-256 test vectors, `hashed_terms` = lexical term hashing). The API, the projection worker and this benchmark all read it, so indexed vectors and query vectors come from the same provider. The provider is recorded in every results file.
+2. **Re-index after changing it:** `docker compose exec api python -m app.outbox.projection_worker --reproject-all`. The report lists how many records reached Qdrant and Neo4j; a store that was unreachable is reported, not counted as done.
+3. **Check every backend is up:** `curl http://localhost:8000/api/v1/system/health` should show `postgres`, `qdrant` and `neo4j` as `healthy`, and the console's System health page should show no pending outbox events.
+
 ## Run the human-labeled benchmark
 
 ```bash
 python -m evals.run_benchmark --queries evals/queries.jsonl --k 10 --repeats 5 --warmup 1
 ```
+
+By default the run stops if any of vector, graph or hybrid retrieval can't run (for example Neo4j is down), so a missing backend can never show up as a recall of 0. To benchmark only what is reachable, add `--allow-partial`; unavailable methods are then reported as "not measured" in `summary.md` and `results.json`.
 
 This writes the output to `evals/results/<timestamp>/` with:
 
