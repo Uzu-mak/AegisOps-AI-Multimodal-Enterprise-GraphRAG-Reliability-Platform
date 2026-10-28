@@ -1,16 +1,19 @@
 """
-AegisOps Agent Workflow.
+AegisOps investigation workflow.
 
-Implements a multi-step agent pipeline:
-  1. Retrieval Agent  — semantic + hybrid memory retrieval
-  2. Graph Reasoning  — Neo4j relationship traversal
-  3. Synthesis        — GraphRAG LLM answer generation
-  4. Critic           — evidence validation
+One auditable pass over operational memory:
 
-Uses a simple sequential state machine. LangGraph can be added as an
-orchestration layer over this workflow in a future iteration.
+  1. Retrieval   one hybrid retrieval call (vector matches, then their graph
+                 neighbours; PostgreSQL keyword fallback if both stores are down)
+  2. Graph links the part of that same result set that came from Neo4j,
+                 recorded as its own step so the trace shows what the graph added
+  3. Synthesis   GraphRAG answer generated from exactly those results
+  4. Critic      rule-based check that every citation points at real evidence
 
-Agent state is ephemeral — it is NOT automatically promoted to PostgreSQL.
+Retrieval happens once; synthesis reuses the retrieved results rather than
+searching again. The trace is returned to the caller and is not persisted.
+Turning a conclusion into a canonical record is a separate, explicit step
+(see app.memory.promotion and POST /api/v1/investigations/findings).
 """
 from __future__ import annotations
 
@@ -19,8 +22,7 @@ import time
 from typing import Optional
 
 from app.agents.critic import RuleBasedCritic
-from app.agents.state import AgentStep, AgentStepType, AgentTrace, ToolCall
-from app.agents.tools import GraphTraversalTool, RetrievalTool
+from app.agents.state import AgentStep, AgentStepType, AgentTrace
 from app.graphrag.pipeline import GraphRAGPipeline, GraphRAGResponse
 from app.memory.working import WorkingMemory
 
@@ -28,152 +30,95 @@ logger = logging.getLogger(__name__)
 
 
 class AegisOpsWorkflow:
-    """
-    Sequential multi-agent workflow for operational fault triage.
-
-    Steps:
-    1. Retrieval (semantic + graph)
-    2. Optional graph expansion
-    3. GraphRAG synthesis
-    4. Critic verification
-    5. Return AgentTrace + GraphRAGResponse
-    """
-
     def __init__(
         self,
-        retrieval_tool: Optional[RetrievalTool],
-        graph_tool: Optional[GraphTraversalTool],
         graphrag_pipeline: GraphRAGPipeline,
         critic: Optional[RuleBasedCritic] = None,
         working_memory_size: int = 50,
     ) -> None:
-        self.retrieval_tool = retrieval_tool
-        self.graph_tool = graph_tool
         self.graphrag = graphrag_pipeline
         self.critic = critic or RuleBasedCritic()
         self.working_memory_size = working_memory_size
 
-    def run(
-        self,
-        task: str,
-        anchor_memory_id: Optional[str] = None,
-    ) -> tuple[AgentTrace, GraphRAGResponse]:
-        """
-        Execute the agent workflow.
-
-        Returns:
-            (AgentTrace, GraphRAGResponse) — trace for inspection,
-            response for delivery.
-        """
+    def run(self, task: str, anchor_memory_id: Optional[str] = None) -> tuple[AgentTrace, GraphRAGResponse]:
         t_start = time.monotonic()
         trace = AgentTrace(task=task, status="running")
         wm = WorkingMemory(max_items=self.working_memory_size)
 
-        # --- Step 1: Retrieval ---
-        if self.retrieval_tool:
-            t0 = time.monotonic()
-            result = self.retrieval_tool.run(query=task, mode="hybrid", limit=10)
-            retrieved_ids = []
-            if result.success and result.output:
-                for item in result.output:
-                    wm.add_evidence(
-                        content=f"{item.get('title', '')}: {item.get('content', '')}",
-                        evidence_memory_ids=[],
-                        source="retrieval",
-                    )
-                    if item.get("memory_id"):
-                        from uuid import UUID
-                        try:
-                            retrieved_ids.append(UUID(item["memory_id"]))
-                        except ValueError:
-                            pass
-
-            trace.add_step(
-                AgentStep(
-                    step_type=AgentStepType.RETRIEVAL,
-                    description=f"Retrieved {len(retrieved_ids)} memories",
-                    tool_call=ToolCall(
-                        tool_name=self.retrieval_tool.name,
-                        arguments={"query": task, "mode": "hybrid"},
-                        result=result.output,
-                        error=result.error,
-                        latency_ms=(time.monotonic() - t0) * 1000,
-                    ),
-                    retrieved_memory_ids=retrieved_ids,
-                    working_memory_snapshot=len(wm),
-                    latency_ms=(time.monotonic() - t0) * 1000,
-                )
+        # 1. Retrieval (single call)
+        results, retrieval_ms = self.graphrag.retrieve(task, anchor_memory_id)
+        hydrated = [r for r in results if r.canonical_record is not None]
+        for r in hydrated:
+            rec = r.canonical_record
+            wm.add_evidence(
+                content=f"{rec.title}: {rec.content}",
+                evidence_memory_ids=[r.memory_id],
+                source=r.retrieval_source,
             )
+        by_source: dict[str, int] = {}
+        for r in hydrated:
+            by_source[r.retrieval_source] = by_source.get(r.retrieval_source, 0) + 1
+        vector_n = by_source.get("semantic", 0) + by_source.get("hybrid", 0)
+        keyword_n = by_source.get("keyword", 0)
+        parts = []
+        if by_source.get("anchor"):
+            parts.append("the starting record")
+        if vector_n:
+            parts.append(f"{vector_n} vector match{'es' if vector_n != 1 else ''}")
+        if keyword_n:
+            parts.append(f"{keyword_n} keyword match{'es' if keyword_n != 1 else ''} from PostgreSQL")
+        trace.add_step(AgentStep(
+            step_type=AgentStepType.RETRIEVAL,
+            description=("Found " + " and ".join(parts)) if parts else "No matching records found",
+            retrieved_memory_ids=[r.memory_id for r in hydrated],
+            working_memory_snapshot=len(wm),
+            latency_ms=retrieval_ms,
+        ))
 
-        # --- Step 2: Graph expansion (optional, using top retrieved memory) ---
-        if self.graph_tool and trace.steps and trace.steps[0].retrieved_memory_ids:
-            top_id = str(trace.steps[0].retrieved_memory_ids[0])
-            t0 = time.monotonic()
-            graph_result = self.graph_tool.run(
-                memory_id=top_id, max_hops=2, limit=20
-            )
-            trace.add_step(
-                AgentStep(
-                    step_type=AgentStepType.GRAPH_REASONING,
-                    description=f"Graph expansion found {len(graph_result.output or [])} related memories",
-                    tool_call=ToolCall(
-                        tool_name=self.graph_tool.name,
-                        arguments={"memory_id": top_id, "max_hops": 2},
-                        result=graph_result.output,
-                        error=graph_result.error,
-                        latency_ms=(time.monotonic() - t0) * 1000,
-                    ),
-                    latency_ms=(time.monotonic() - t0) * 1000,
-                )
-            )
+        # 2. Graph links (same result set, attributed)
+        graph_results = [r for r in hydrated if r.retrieval_source in ("graph", "hybrid")]
+        context_results = [r for r in hydrated if r.retrieval_source == "context"]
+        anchor = getattr(self.graphrag.retriever, "last_anchor_id", None)
+        if context_results:
+            graph_results = context_results
+            graph_desc = (f"Relationship store unavailable; added {len(context_results)} record"
+                          f"{'s' if len(context_results) != 1 else ''} sharing the starting record's incident or asset from PostgreSQL")
+        elif getattr(self.graphrag.retriever, "graph_index", None) is None:
+            graph_desc = "Relationship store unavailable; no graph links added"
+        elif anchor is None:
+            graph_desc = "No starting record for graph links"
+        else:
+            graph_desc = f"{len(graph_results)} record{'s' if len(graph_results) != 1 else ''} linked to the top match through shared asset, line, incident, source or supersession"
+        trace.add_step(AgentStep(
+            step_type=AgentStepType.GRAPH_REASONING,
+            description=graph_desc,
+            retrieved_memory_ids=[r.memory_id for r in graph_results],
+            output_summary=str(anchor) if anchor else "",
+        ))
 
-        # --- Step 3: GraphRAG synthesis ---
+        # 3. Synthesis from exactly those results
         t0 = time.monotonic()
-        rag_response = self.graphrag.query(
-            question=task,
-            anchor_memory_id=anchor_memory_id,
-        )
-        trace.add_step(
-            AgentStep(
-                step_type=AgentStepType.SYNTHESIS,
-                description=f"GraphRAG synthesis using {len(rag_response.evidence)} evidence items",
-                output_summary=rag_response.answer[:200],
-                latency_ms=(time.monotonic() - t0) * 1000,
-            )
-        )
+        rag = self.graphrag.answer(task, results, retrieval_ms)
+        trace.add_step(AgentStep(
+            step_type=AgentStepType.SYNTHESIS,
+            description=f"Answer written from {len(rag.evidence)} evidence record{'s' if len(rag.evidence) != 1 else ''} by {rag.model_name}",
+            output_summary=rag.answer[:200],
+            latency_ms=(time.monotonic() - t0) * 1000,
+        ))
 
-        # --- Step 4: Critic verification ---
+        # 4. Critic
         t0 = time.monotonic()
-        critic_result = self.critic.verify(
-            answer=rag_response.answer,
-            evidence=rag_response.evidence,
-        )
-        trace.critic_result = critic_result
-        trace.add_step(
-            AgentStep(
-                step_type=AgentStepType.CRITIC,
-                description=(
-                    f"Critic: supported={critic_result.is_supported} "
-                    f"confidence={critic_result.confidence:.2f}"
-                ),
-                output_summary=critic_result.notes,
-                latency_ms=(time.monotonic() - t0) * 1000,
-            )
-        )
+        critic = self.critic.verify(answer=rag.answer, evidence=rag.evidence)
+        trace.critic_result = critic
+        trace.add_step(AgentStep(
+            step_type=AgentStepType.CRITIC,
+            description="Citations check out" if critic.is_supported else "Answer is not fully supported by cited evidence",
+            output_summary=critic.notes,
+            latency_ms=(time.monotonic() - t0) * 1000,
+        ))
 
-        trace.final_answer = rag_response.answer
-        trace.evidence_memory_ids = [
-            e.memory_id
-            for r in rag_response.retrieval_results
-            if r.canonical_record is not None
-            for e in [r]  # flatten
-        ]
+        trace.final_answer = rag.answer
+        trace.evidence_memory_ids = [r.memory_id for r in hydrated[: len(rag.evidence)]]
         trace.total_latency_ms = (time.monotonic() - t_start) * 1000
         trace.status = "complete"
-
-        logger.info(
-            f"Agent workflow complete: {len(trace.steps)} steps, "
-            f"{trace.total_latency_ms:.1f}ms"
-        )
-
-        return trace, rag_response
+        return trace, rag

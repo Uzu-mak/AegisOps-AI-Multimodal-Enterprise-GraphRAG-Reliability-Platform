@@ -23,7 +23,17 @@ logger = logging.getLogger(__name__)
 
 # Type aliases
 SessionFactory = Callable[[], Session]
+_DEFERRED = "__deferred__"
 ProjectionFn = Callable[[str, str], None]  # (memory_id_str, operation) -> None
+
+
+class ProjectionDeferred(Exception):
+    """
+    Raised by a projection function when its store is unreachable.
+
+    The event is left in its previous state without consuming a retry, so a
+    long outage does not push every event to FAILED.
+    """
 
 
 class OutboxWorker:
@@ -57,7 +67,7 @@ class OutboxWorker:
 
         Returns a summary: {completed, failed, skipped}.
         """
-        stats = {"completed": 0, "failed": 0, "skipped": 0}
+        stats = {"completed": 0, "failed": 0, "skipped": 0, "deferred": 0}
 
         with self._session_factory() as session:
             pending = session.scalars(
@@ -67,6 +77,7 @@ class OutboxWorker:
                         [ProjectionStatus.PENDING.value, ProjectionStatus.RETRYING.value]
                     )
                 )
+                .order_by(ProjectionOutboxEvent.occurred_at, ProjectionOutboxEvent.created_at)
                 .limit(batch_size)
                 .with_for_update(skip_locked=True)
             ).all()
@@ -79,6 +90,7 @@ class OutboxWorker:
                     stats["failed"] += 1
                     continue
 
+                previous_status = event.status
                 # Mark as processing
                 event.status = ProjectionStatus.PROCESSING.value
                 event.updated_at = datetime.now(timezone.utc)
@@ -86,7 +98,10 @@ class OutboxWorker:
 
                 success, error = self._run_projection(event)
 
-                if success:
+                if error is _DEFERRED:
+                    event.status = previous_status
+                    stats["deferred"] += 1
+                elif success:
                     event.status = ProjectionStatus.COMPLETED.value
                     event.completed_at = datetime.now(timezone.utc)
                     stats["completed"] += 1
@@ -103,7 +118,10 @@ class OutboxWorker:
 
             session.commit()
 
-        logger.info(f"OutboxWorker batch: {stats}")
+        if stats["completed"] or stats["failed"] or stats["skipped"]:
+            logger.info(f"OutboxWorker batch: {stats}")
+        else:
+            logger.debug(f"OutboxWorker batch: {stats}")
         return stats
 
     def _run_projection(
@@ -124,6 +142,8 @@ class OutboxWorker:
                     f"No handler for projection_type={proj_type}; marking complete"
                 )
             return True, None
+        except ProjectionDeferred:
+            return False, _DEFERRED
         except Exception as exc:
             logger.warning(
                 f"Projection failed for event {event.id} "

@@ -31,6 +31,15 @@ def mock_graph_index():
     return gi
 
 
+def _canonical(session_factory, *ids):
+    """Make the mocked PostgreSQL contain active records for these IDs."""
+    from types import SimpleNamespace
+    session = session_factory.return_value
+    session.scalars.return_value.all.return_value = [
+        SimpleNamespace(id=i, status="active", importance=0.5, created_at=None, observed_at=None) for i in ids
+    ]
+
+
 @pytest.fixture
 def mock_session_factory():
     """Session factory that returns empty records."""
@@ -58,6 +67,7 @@ class TestHybridRetrieverSemanticMode:
         mock_result.score = 0.9
 
         mock_semantic_index.search_similar.return_value = [mock_result]
+        _canonical(mock_session_factory, mid)
 
         retriever = HybridMemoryRetriever(
             semantic_index=mock_semantic_index,
@@ -96,6 +106,7 @@ class TestHybridRetrieverGraphMode:
         anchor = uuid4()
         related_id = uuid4()
         mock_graph_index.get_related_memory_ids.return_value = [related_id]
+        _canonical(mock_session_factory, related_id)
 
         retriever = HybridMemoryRetriever(
             semantic_index=mock_semantic_index,
@@ -124,6 +135,7 @@ class TestHybridRetrieverMerge:
         sem_result.score = 0.8
         mock_semantic_index.search_similar.return_value = [sem_result]
         mock_graph_index.get_related_memory_ids.return_value = [shared_id]
+        _canonical(mock_session_factory, shared_id)
 
         retriever = HybridMemoryRetriever(
             semantic_index=mock_semantic_index,
@@ -188,3 +200,21 @@ class TestHybridRetrieverGracefulDegradation:
         )
         results = retriever.retrieve(RetrievalQuery(text="test"))
         assert results == []
+
+
+class TestStaleProjections:
+
+    def test_hits_missing_from_postgres_are_dropped(self, mock_embedding_provider, mock_semantic_index, mock_session_factory):
+        live, stale = uuid4(), uuid4()
+        mock_semantic_index.search_similar.return_value = [MagicMock(memory_id=stale, score=0.9), MagicMock(memory_id=live, score=0.5)]
+        _canonical(mock_session_factory, live)
+        retriever = HybridMemoryRetriever(mock_semantic_index, None, mock_embedding_provider, mock_session_factory)
+        assert [r.memory_id for r in retriever.retrieve(RetrievalQuery(text="q", mode="semantic"))] == [live]
+
+    def test_hits_are_kept_when_postgres_cannot_be_read(self, mock_embedding_provider, mock_semantic_index):
+        mid = uuid4()
+        mock_semantic_index.search_similar.return_value = [MagicMock(memory_id=mid, score=0.9)]
+        broken = MagicMock(side_effect=RuntimeError("db down"))
+        retriever = HybridMemoryRetriever(mock_semantic_index, None, mock_embedding_provider, broken)
+        results = retriever.retrieve(RetrievalQuery(text="q", mode="semantic"))
+        assert [r.memory_id for r in results] == [mid] and results[0].canonical_record is None

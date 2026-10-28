@@ -40,6 +40,7 @@ def _settings():
         LLM_TIMEOUT_SECONDS=15.0,
         QDRANT_URL="http://qdrant:6333",
         QDRANT_COLLECTION_NAME="memories",
+        KAFKA_ENABLED=True,
         NEO4J_URI="bolt://neo4j:7687",
         NEO4J_USERNAME="neo4j",
         NEO4J_PASSWORD="aegisops",
@@ -103,11 +104,10 @@ def test_observability_uses_status_semantics_without_fake_zeroes():
     assert body["api_runtime"]["request_latency_p50"]["status"] == "NOT_INSTRUMENTED"
     assert body["api_runtime"]["request_latency_p50"]["value"] is None
 
-    assert body["scalar_sensor_ingestion"]["events_received"]["status"] == "NOT_CONNECTED"
-    assert body["scalar_sensor_ingestion"]["events_received"]["value"] is None
+    assert "scalar_sensor_ingestion" not in body  # no such pipeline exists in this system
 
-    assert body["vision_pipeline"]["frames_received"]["status"] == "NOT_CONNECTED"
-    assert body["vision_pipeline"]["frames_received"]["value"] is None
+    assert "vision_pipeline" not in body
+    assert body["investigations"]["investigations_run"]["status"] == "AVAILABLE"
 
     assert body["llm"]["request_count"]["status"] == "NOT_INSTRUMENTED"
     assert body["llm"]["request_count"]["value"] is None
@@ -154,7 +154,7 @@ def test_projection_metrics_outbox_counts_and_no_consumer_lag_fabrication():
     assert body["kafka_outbox"]["pending_outbox_events"]["value"] == 5
     assert body["kafka_outbox"]["published_events"]["value"] == 10
 
-    assert body["kafka_outbox"]["consumer_lag"]["status"] == "NOT_CONNECTED"
+    assert body["kafka_outbox"]["consumer_lag"]["status"] == "NOT_INSTRUMENTED"  # not applicable, not a fault
     assert "consumers not implemented" in body["kafka_outbox"]["consumer_lag"]["detail"].lower()
 
     assert body["qdrant"]["recall_at_10"]["status"] == "NOT_INSTRUMENTED"

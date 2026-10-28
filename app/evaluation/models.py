@@ -54,10 +54,12 @@ class EvalCaseResult:
     retrieved_memory_ids: list[str] = field(default_factory=list)
     answer: str = ""
     success: bool = False
+    recall_at_5: float = 0.0
     recall_at_k: float = 0.0  # Recall@K
-    mrr: float = 0.0          # Mean Reciprocal Rank
-    groundedness: float = 0.0  # Fraction of sentences with citations
-    citation_accuracy: float = 0.0
+    mrr: float = 0.0          # Reciprocal rank of first relevant result within K
+    groundedness: Optional[float] = None  # only for modes that produce an answer
+    citation_accuracy: Optional[float] = None
+    labeled: bool = True      # False when the case has no expected IDs
     retrieval_latency_ms: float = 0.0
     generation_latency_ms: float = 0.0
     total_latency_ms: float = 0.0
@@ -89,3 +91,6 @@ class EvalRun:
     total_cases: int = 0
     failed_cases: int = 0
     failure_taxonomy: dict[str, int] = field(default_factory=dict)
+    k: int = 10
+    # Aggregates per mode; averaging across modes would mix different systems.
+    per_mode: dict[str, dict] = field(default_factory=dict)

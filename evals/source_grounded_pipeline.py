@@ -187,11 +187,12 @@ def index_source_memories(record_ids: dict[str, str], qdrant_url: str) -> None:
 
     from qdrant_client import QdrantClient
 
-    from app.embeddings.fake import DeterministicFakeEmbedding
+    from app.embeddings.factory import create_embedding_provider
     from app.semantic.index import VectorRecord
     from app.semantic.qdrant_impl import QdrantSemanticIndex
 
-    embedding_provider = DeterministicFakeEmbedding()
+    # Must match the provider the benchmark queries with (EMBEDDING_PROVIDER).
+    embedding_provider = create_embedding_provider()
     client = QdrantClient(qdrant_url)
     semantic_index = QdrantSemanticIndex(
         qdrant_client=client,

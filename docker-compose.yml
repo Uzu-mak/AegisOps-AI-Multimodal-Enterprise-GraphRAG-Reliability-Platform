@@ -21,6 +21,7 @@ services:
       NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_PROJECTION_TOPIC: ${KAFKA_PROJECTION_TOPIC:-aegisops.memory.projections.v1}
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
       LLM_PROVIDER: ${LLM_PROVIDER:-test}
       LLM_MODEL: ${LLM_MODEL:-gpt-5.6-terra}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -111,6 +112,7 @@ services:
       - aegisops-network
 
   kafka:
+    profiles: ["integration"]
     image: apache/kafka:4.3.1
     container_name: aegisops-kafka
     environment:
@@ -142,6 +144,7 @@ services:
       - aegisops-network
 
   kafka-init:
+    profiles: ["integration"]
     image: apache/kafka:4.3.1
     depends_on:
       kafka:
@@ -156,6 +159,7 @@ services:
       - aegisops-network
 
   outbox-publisher:
+    profiles: ["integration"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -185,37 +189,23 @@ services:
     networks:
       - aegisops-network
 
-  ui:
+  projection-worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: aegisops-ui
+    container_name: aegisops-projection-worker
     env_file:
       - .env
     environment:
-      PYTHONPATH: /app
       DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB}"
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
       NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-aegisops}
-      AEGISOPS_API_URL: http://api:8000
-      LLM_PROVIDER: ${LLM_PROVIDER:-test}
-      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-terra}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-    command:
-      [
-        "streamlit",
-        "run",
-        "ui/app.py",
-        "--server.port=8501",
-        "--server.address=0.0.0.0",
-        "--server.headless=true",
-      ]
-    ports:
-      - "8501:8501"
+      OUTBOX_WORKER_POLL_SECONDS: ${OUTBOX_WORKER_POLL_SECONDS:-2.0}
+    command: ["python", "-m", "app.outbox.projection_worker"]
     depends_on:
-      api:
+      postgres:
         condition: service_healthy
     restart: unless-stopped
     networks:

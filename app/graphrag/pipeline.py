@@ -66,44 +66,71 @@ class GraphRAGPipeline:
         self.context_limit = context_limit
         self.retrieval_mode = retrieval_mode
 
-    def query(
-        self,
-        question: str,
-        anchor_memory_id: Optional[str] = None,
-    ) -> GraphRAGResponse:
-        """
-        Answer an operational question using hybrid evidence retrieval + LLM.
-
-        Returns a GraphRAGResponse with the answer, evidence items, and
-        latency breakdown.
-        """
-        t_start = time.monotonic()
-
-        # --- Retrieval ---
-        t_retrieve = time.monotonic()
+    def retrieve(self, question: str, anchor_memory_id: Optional[str] = None) -> tuple[list[RetrievalResult], float]:
+        """Retrieve evidence once (hybrid, with PostgreSQL keyword fallback). Returns (results, ms)."""
+        t0 = time.monotonic()
         try:
             from uuid import UUID
+
             anchor_id = UUID(anchor_memory_id) if anchor_memory_id else None
-            query = RetrievalQuery(
-                text=question,
-                mode=self.retrieval_mode,
-                anchor_memory_id=anchor_id,
-                final_limit=self.context_limit,
+            results = self.retriever.retrieve(
+                RetrievalQuery(
+                    text=question,
+                    mode=self.retrieval_mode,
+                    anchor_memory_id=anchor_id,
+                    final_limit=self.context_limit,
+                    keyword_fallback=True,
+                )
             )
-            results = self.retriever.retrieve(query)
         except Exception as exc:
             logger.warning(f"GraphRAG retrieval failed: {exc}")
             results = []
-        retrieval_ms = (time.monotonic() - t_retrieve) * 1000
+        if anchor_memory_id:
+            results = self._scope_to_anchor(results, anchor_memory_id)
+        return results, (time.monotonic() - t0) * 1000
 
-        # --- Context construction ---
-        ctx: BuiltContext = build_context(
-            question=question,
-            results=results,
-            max_evidence=self.context_limit,
-        )
+    def _scope_to_anchor(self, results: list[RetrievalResult], anchor_memory_id: str) -> list[RetrievalResult]:
+        """
+        An investigation that starts from a record is about that record's context:
+        the record itself comes first, then records sharing its incident or asset,
+        then everything else in retrieval order. Without Neo4j, the shared-incident
+        records are read from PostgreSQL so the scope does not depend on the graph.
+        """
+        from uuid import UUID
 
-        # --- LLM generation ---
+        get = getattr(self.retriever, "get_record", None)
+        if get is None:
+            return results
+        try:
+            anchor = get(UUID(anchor_memory_id))
+        except Exception:  # noqa: BLE001
+            anchor = None
+        if anchor is None or str(anchor.status) != "active":
+            return results
+
+        by_id = {r.memory_id: r for r in results}
+        if getattr(self.retriever, "graph_index", None) is None and hasattr(self.retriever, "context_records"):
+            for extra in self.retriever.context_records(anchor):
+                by_id.setdefault(extra.memory_id, extra)
+        by_id.pop(anchor.id, None)
+
+        def same_context(r: RetrievalResult) -> bool:
+            rec = r.canonical_record
+            if rec is None:
+                return False
+            if anchor.incident_id:
+                return rec.incident_id == anchor.incident_id
+            return bool(anchor.asset_id) and rec.asset_id == anchor.asset_id
+
+        ordered = list(by_id.values())
+        scoped = [r for r in ordered if same_context(r)] + [r for r in ordered if not same_context(r)]
+        return [RetrievalResult(memory_id=anchor.id, retrieval_source="anchor", canonical_record=anchor)] + scoped
+
+    def answer(self, question: str, results: list[RetrievalResult], retrieval_ms: float = 0.0) -> GraphRAGResponse:
+        """Generate an evidence-grounded answer from already-retrieved results."""
+        t_start = time.monotonic()
+        ctx: BuiltContext = build_context(question=question, results=results, max_evidence=self.context_limit)
+
         t_gen = time.monotonic()
         try:
             messages = [
@@ -111,44 +138,40 @@ class GraphRAGPipeline:
                 LLMMessage(role="user", content=ctx.user_prompt),
             ]
             llm_resp = self.llm.generate(messages, temperature=0.0, max_tokens=1024)
-            answer = llm_resp.content
-            model_name = llm_resp.model_name
-            prompt_tokens = llm_resp.prompt_tokens
-            completion_tokens = llm_resp.completion_tokens
+            answer, model_name = llm_resp.content, llm_resp.model_name
+            prompt_tokens, completion_tokens = llm_resp.prompt_tokens, llm_resp.completion_tokens
             is_synthetic = "deterministic-test" in model_name
         except LLMProviderError as exc:
             logger.warning(f"GraphRAG LLM provider error: {exc}")
-            answer = f"[LLM generation unavailable: {exc}]"
-            model_name = "error"
-            prompt_tokens = 0
-            completion_tokens = 0
-            is_synthetic = True
+            answer, model_name, prompt_tokens, completion_tokens, is_synthetic = (
+                f"[LLM generation unavailable: {exc}]", "error", 0, 0, True)
         except Exception as exc:
             logger.error(f"GraphRAG LLM generation failed: {exc}")
-            answer = "[LLM generation failed due to an unexpected error.]"
-            model_name = "error"
-            prompt_tokens = 0
-            completion_tokens = 0
-            is_synthetic = True
+            answer, model_name, prompt_tokens, completion_tokens, is_synthetic = (
+                "[LLM generation failed due to an unexpected error.]", "error", 0, 0, True)
         generation_ms = (time.monotonic() - t_gen) * 1000
-        total_ms = (time.monotonic() - t_start) * 1000
 
-        logger.info(
-            f"GraphRAG query complete: {len(results)} evidence items, "
-            f"retrieval={retrieval_ms:.1f}ms generation={generation_ms:.1f}ms"
-        )
+        effective_mode = self.retrieval_mode
+        if results and all(r.retrieval_source == "keyword" for r in results):
+            effective_mode = "keyword_fallback"
 
+        logger.info(f"GraphRAG answer: {len(ctx.evidence_items)} evidence items, generation={generation_ms:.1f}ms")
         return GraphRAGResponse(
             question=question,
             answer=answer,
             evidence=ctx.evidence_items,
             retrieval_results=results,
-            retrieval_mode=self.retrieval_mode,
+            retrieval_mode=effective_mode,
             model_name=model_name,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             retrieval_latency_ms=retrieval_ms,
             generation_latency_ms=generation_ms,
-            total_latency_ms=total_ms,
+            total_latency_ms=retrieval_ms + (time.monotonic() - t_start) * 1000,
             is_synthetic_response=is_synthetic,
         )
+
+    def query(self, question: str, anchor_memory_id: Optional[str] = None) -> GraphRAGResponse:
+        """Retrieve evidence, then answer from it."""
+        results, retrieval_ms = self.retrieve(question, anchor_memory_id)
+        return self.answer(question, results, retrieval_ms)

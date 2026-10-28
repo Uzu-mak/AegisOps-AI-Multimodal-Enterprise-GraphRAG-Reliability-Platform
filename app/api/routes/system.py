@@ -16,6 +16,10 @@ from app.outbox.models import ProjectionOutboxEvent, ProjectionStatus
 router = APIRouter(prefix="/api/v1", tags=["system"])
 
 
+class _KafkaDisabled(Exception):
+    """Kafka integration stream is switched off by configuration."""
+
+
 def _collect_service_health() -> dict[str, dict[str, Any]]:
     from app.graphrag.providers import llm_health_from_settings
 
@@ -32,29 +36,12 @@ def _collect_service_health() -> dict[str, dict[str, Any]]:
     except Exception as exc:
         health["postgres"] = {"status": "unhealthy", "error": str(exc)}
 
-    # Qdrant
-    try:
-        from qdrant_client import QdrantClient
+    # Qdrant / Neo4j — cached clients, short timeouts, fail fast during cool-down
+    from app.core.connections import get_connections
 
-        client = QdrantClient(settings.QDRANT_URL)
-        client.get_collections()
-        health["qdrant"] = {"status": "healthy", "url": settings.QDRANT_URL}
-    except Exception as exc:
-        health["qdrant"] = {"status": "unavailable", "error": str(exc)}
-
-    # Neo4j
-    try:
-        from neo4j import GraphDatabase
-
-        driver = GraphDatabase.driver(
-            settings.NEO4J_URI,
-            auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD),
-        )
-        driver.verify_connectivity()
-        driver.close()
-        health["neo4j"] = {"status": "healthy", "uri": settings.NEO4J_URI}
-    except Exception as exc:
-        health["neo4j"] = {"status": "unavailable", "error": str(exc)}
+    conns = get_connections()
+    health["qdrant"] = conns.probe("qdrant")
+    health["neo4j"] = conns.probe("neo4j")
 
     llm_health = llm_health_from_settings(settings)
     health["llm"] = {
@@ -65,6 +52,14 @@ def _collect_service_health() -> dict[str, dict[str, Any]]:
     }
     if llm_health.error:
         health["llm"]["error"] = llm_health.error
+    try:
+        from app.graphrag.providers import create_llm_provider
+
+        active_model = create_llm_provider(settings).get_model_name()
+    except Exception:  # noqa: BLE001
+        active_model = None
+    health["llm"]["active_model"] = active_model
+    health["llm"]["synthetic"] = bool(active_model and "deterministic-test" in active_model)
 
     return health
 
@@ -91,7 +86,21 @@ def _not_instrumented(detail: str = "Not instrumented") -> dict[str, Any]:
 def system_health() -> dict:
     """Check health of all AegisOps services."""
     health = _collect_service_health()
-    return {"status": _overall_status(health), "services": health}
+    from app.api.deps import get_embedding_provider
+
+    embedder = get_embedding_provider()
+    return {
+        "status": _overall_status(health),
+        "services": health,
+        "integrations": {
+            "kafka_enabled": bool(getattr(core_config.get_settings(), "KAFKA_ENABLED", False)),
+        },
+        "embedding_provider": {
+            "name": type(embedder).__name__,
+            "dimension": embedder.get_dimension(),
+            "semantic": False,  # neither bundled provider is a semantic model
+        },
+    }
 
 
 @router.get("/system/memory-stats")
@@ -160,6 +169,7 @@ def observability_metrics() -> dict[str, Any]:
     write = metrics_collector.canonical_write_snapshot(window_seconds=900)
     retrieval = metrics_collector.retrieval_snapshot(window_seconds=900)
     llm_runtime = metrics_collector.llm_snapshot(window_seconds=900)
+    investigations = metrics_collector.investigation_snapshot(window_seconds=900)
 
     cpu_metric = _not_instrumented("Not instrumented")
     mem_metric = _not_instrumented("Not instrumented")
@@ -220,36 +230,6 @@ def observability_metrics() -> dict[str, Any]:
         ),
     }
 
-    scalar_ingestion = {
-        "events_received": _not_connected("Pipeline not connected / Not instrumented"),
-        "events_per_sec": _not_connected("Pipeline not connected / Not instrumented"),
-        "accepted_events": _not_connected("Pipeline not connected / Not instrumented"),
-        "rejected_events": _not_connected("Pipeline not connected / Not instrumented"),
-        "schema_validation_failures": _not_connected("Pipeline not connected / Not instrumented"),
-        "duplicate_rate": _not_connected("Pipeline not connected / Not instrumented"),
-        "ingestion_lag": _not_connected("Pipeline not connected / Not instrumented"),
-        "processing_latency_p50": _not_connected("Pipeline not connected / Not instrumented"),
-        "processing_latency_p95": _not_connected("Pipeline not connected / Not instrumented"),
-        "anomaly_promotions": _not_connected("Pipeline not connected / Not instrumented"),
-        "anomaly_promotion_precision": _not_instrumented("Not evaluated"),
-    }
-
-    vision_ingestion = {
-        "frames_received": _not_connected("Not connected"),
-        "frames_processed_per_sec": _not_connected("Not connected"),
-        "dropped_frames": _not_connected("Not connected"),
-        "inference_latency_p50": _not_instrumented("Not instrumented"),
-        "inference_latency_p95": _not_instrumented("Not instrumented"),
-        "anomaly_detections": _not_connected("Not connected"),
-        "precision": _not_instrumented("Not evaluated"),
-        "recall": _not_instrumented("Not evaluated"),
-        "false_positive_rate": _not_instrumented("Not evaluated"),
-        "model_version": _not_connected("Not connected"),
-        "gpu_utilization": _not_instrumented("Not instrumented"),
-        "gpu_memory": _not_instrumented("Not instrumented"),
-        "anomaly_promotion_precision": _not_instrumented("Not evaluated"),
-    }
-
     llm_group = {
         "provider": metric_value(status=MetricStatus.AVAILABLE, value=services.get("llm", {}).get("provider", "unknown")),
         "model": metric_value(status=MetricStatus.AVAILABLE, value=services.get("llm", {}).get("model", settings.LLM_MODEL)),
@@ -290,16 +270,13 @@ def observability_metrics() -> dict[str, Any]:
             "db_connection_state": db_connection_state,
         },
         "canonical_memory": canonical_group,
-        "scalar_sensor_ingestion": scalar_ingestion,
-        "vision_pipeline": vision_ingestion,
         "llm": llm_group,
-        "agents_tools": {
-            "agent_task_count": _not_instrumented("Not instrumented"),
-            "agent_task_success_rate": _not_instrumented("Not instrumented"),
-            "tool_call_success_rate": _not_instrumented("Not instrumented"),
-            "tool_retries": _not_instrumented("Not instrumented"),
-            "human_override_rate": _not_instrumented("Not instrumented"),
-            "promotion_acceptance_rate": _not_instrumented("Not instrumented"),
+        "investigations": {
+            "investigations_run": metric_value(status=MetricStatus.AVAILABLE, value=investigations["investigations"], unit="runs"),
+            "critic_supported_rate": _status_metric_for_optional(investigations["supported_rate"], unit="ratio", detail="No investigations yet"),
+            "investigation_latency_p50": _status_metric_for_optional(investigations["latency_p50_ms"], unit="ms", detail="No investigations yet"),
+            "findings_submitted": metric_value(status=MetricStatus.AVAILABLE, value=investigations["findings_submitted"], unit="findings"),
+            "finding_acceptance_rate": _status_metric_for_optional(investigations["finding_acceptance_rate"], unit="ratio", detail="No findings submitted yet"),
         },
         "retrieval_runtime": retrieval,
     }
@@ -334,9 +311,14 @@ def projection_metrics() -> dict[str, Any]:
         )
         kafka_failed_attempts = session.scalar(select(func.sum(ProjectionOutboxEvent.kafka_retry_count)))
         projection_retries = session.scalar(select(func.sum(ProjectionOutboxEvent.retry_count)))
+        kafka_enabled = bool(getattr(settings, "KAFKA_ENABLED", False))
         oldest_pending = session.scalar(
             select(func.min(ProjectionOutboxEvent.occurred_at)).where(
                 ProjectionOutboxEvent.kafka_published_at.is_(None)
+                if kafka_enabled
+                else ProjectionOutboxEvent.status.in_(
+                    [ProjectionStatus.PENDING.value, ProjectionStatus.RETRYING.value, ProjectionStatus.PROCESSING.value]
+                )
             )
         )
         published_recent = session.scalar(
@@ -420,9 +402,17 @@ def projection_metrics() -> dict[str, Any]:
     kafka_health = _not_connected("Kafka broker unavailable")
     kafka_partitions = _not_connected("Kafka broker unavailable")
     try:
+        if not kafka_enabled:
+            raise _KafkaDisabled()
         from kafka import KafkaAdminClient
 
-        admin = KafkaAdminClient(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS, client_id="aegisops-health")
+        timeout_ms = int(float(getattr(settings, "PROJECTION_CONNECT_TIMEOUT_SECONDS", 2)) * 1000)
+        admin = KafkaAdminClient(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            client_id="aegisops-health",
+            request_timeout_ms=max(timeout_ms, 1000),
+            api_version_auto_timeout_ms=max(timeout_ms, 1000),
+        )
         topic_meta = admin.describe_topics([settings.KAFKA_PROJECTION_TOPIC])[0]
         kafka_health = metric_value(status=MetricStatus.AVAILABLE, value="healthy")
         kafka_partitions = metric_value(
@@ -431,15 +421,21 @@ def projection_metrics() -> dict[str, Any]:
             unit="partitions",
         )
         admin.close()
+    except _KafkaDisabled:
+        off = "Integration stream off (KAFKA_ENABLED=false); not required for projections"
+        kafka_health = _not_instrumented(off)
+        kafka_partitions = _not_instrumented(off)
     except Exception as exc:
         kafka_health = metric_value(status=MetricStatus.NOT_CONNECTED, value=None, detail=str(exc))
 
     qdrant_projected = _not_connected("Qdrant not connected")
     if services.get("qdrant", {}).get("status") in {"healthy", "degraded"}:
         try:
-            from qdrant_client import QdrantClient
+            from app.core.connections import get_connections
 
-            client = QdrantClient(settings.QDRANT_URL)
+            client = get_connections().qdrant_client()
+            if client is None:
+                raise RuntimeError("Qdrant not connected")
             count_res = client.count(collection_name=settings.QDRANT_COLLECTION_NAME, exact=True)
             qdrant_projected = metric_value(status=MetricStatus.AVAILABLE, value=int(count_res.count), unit="records")
         except Exception as exc:
@@ -449,16 +445,14 @@ def projection_metrics() -> dict[str, Any]:
     neo4j_relationships = _not_connected("Neo4j not connected")
     if services.get("neo4j", {}).get("status") in {"healthy", "degraded"}:
         try:
-            from neo4j import GraphDatabase
+            from app.core.connections import get_connections
 
-            driver = GraphDatabase.driver(
-                settings.NEO4J_URI,
-                auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD),
-            )
+            driver = get_connections().neo4j_driver()
+            if driver is None:
+                raise RuntimeError("Neo4j not connected")
             with driver.session(database=settings.NEO4J_DATABASE) as neo_session:
                 node_count = neo_session.run("MATCH (m:Memory) RETURN count(m) AS c").single()["c"]
                 rel_count = neo_session.run("MATCH ()-[r]->() RETURN count(r) AS c").single()["c"]
-            driver.close()
             neo4j_nodes = metric_value(status=MetricStatus.AVAILABLE, value=int(node_count), unit="nodes")
             neo4j_relationships = metric_value(status=MetricStatus.AVAILABLE, value=int(rel_count), unit="relationships")
         except Exception as exc:
@@ -471,8 +465,10 @@ def projection_metrics() -> dict[str, Any]:
         "generated_at": now.isoformat(),
         "kafka_outbox": {
             "pending_outbox_events": metric_value(status=MetricStatus.AVAILABLE, value=int(pending_outbox or 0), unit="events"),
-            "published_events": metric_value(status=MetricStatus.AVAILABLE, value=int(published_events or 0), unit="events"),
-            "failed_publication_attempts": metric_value(status=MetricStatus.AVAILABLE, value=int(kafka_failed_attempts or 0), unit="attempts"),
+            "published_events": metric_value(status=MetricStatus.AVAILABLE, value=int(published_events or 0), unit="events")
+            if kafka_enabled else _not_instrumented("Integration stream off (KAFKA_ENABLED=false)"),
+            "failed_publication_attempts": metric_value(status=MetricStatus.AVAILABLE, value=int(kafka_failed_attempts or 0), unit="attempts")
+            if kafka_enabled else _not_instrumented("Integration stream off (KAFKA_ENABLED=false)"),
             "retry_count": metric_value(status=MetricStatus.AVAILABLE, value=int(projection_retries or 0), unit="retries"),
             "oldest_pending_event_age": _status_metric_for_optional(oldest_pending_age, unit="seconds", detail="No pending events"),
             "publication_throughput": metric_value(
@@ -484,9 +480,10 @@ def projection_metrics() -> dict[str, Any]:
             "topic": metric_value(status=MetricStatus.AVAILABLE, value=settings.KAFKA_PROJECTION_TOPIC),
             "partition_count": kafka_partitions,
             "consumer_lag": metric_value(
-                status=MetricStatus.NOT_CONNECTED,
+                status=MetricStatus.NOT_INSTRUMENTED,
                 value=None,
-                detail="Not applicable — consumers not implemented",
+                detail="Not applicable — Kafka consumers not implemented; Kafka is the outbound stream for "
+                "external systems, projections are applied from the PostgreSQL outbox by the projection worker",
             ),
         },
         "qdrant": {

@@ -43,6 +43,7 @@ class HybridRetrieveRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=50)
     graph_hops: int = Field(default=2, ge=1, le=5)
     anchor_memory_id: Optional[str] = None
+    include_inactive: bool = False
 
 
 class GraphRelatedRequest(BaseModel):
@@ -62,6 +63,7 @@ class RetrievalResultOut(BaseModel):
     retrieval_source: str
     semantic_score: Optional[float]
     graph_path: Optional[str]
+    keyword_score: Optional[float] = None
     memory_type: Optional[str]
     title: Optional[str]
     content_preview: Optional[str]
@@ -73,6 +75,7 @@ class RetrievalResultOut(BaseModel):
 
 
 class HybridRetrieveResponse(BaseModel):
+    anchor_memory_id: Optional[str] = None
     results: list[RetrievalResultOut]
     total: int
     mode: str
@@ -157,6 +160,14 @@ def hybrid_retrieve(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Graph retrieval mode is unavailable because Neo4j is unavailable",
         )
+    if request.mode == "graph" and semantic_index is None and not request.anchor_memory_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Graph retrieval needs a starting record: pass anchor_memory_id, "
+                "or bring Qdrant back so the best text match can be used as the anchor"
+            ),
+        )
     if request.mode == "hybrid" and semantic_index is None and graph_index is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -180,15 +191,18 @@ def hybrid_retrieve(
         anchor_memory_id=anchor_id,
         final_limit=request.limit,
         graph_hops=request.graph_hops,
+        include_inactive=request.include_inactive,
     )
     results = retriever.retrieve(query)
     latency_ms = (time.monotonic() - t0) * 1000
     metrics_collector.observe_retrieval(request.mode, latency_ms)
+    used_anchor = getattr(retriever, "last_anchor_id", None)
     return HybridRetrieveResponse(
         results=_format_results(results),
         total=len(results),
         mode=request.mode,
         latency_ms=latency_ms,
+        anchor_memory_id=str(used_anchor) if used_anchor else None,
     )
 
 
@@ -274,6 +288,7 @@ def graphrag_query(
                 "content_preview": e.content[:300],
                 "retrieval_source": e.retrieval_source,
                 "semantic_score": e.semantic_score,
+                "graph_path": e.graph_path,
                 "asset_id": e.asset_id,
                 "facility_id": e.facility_id,
                 "confidence": e.confidence,
@@ -298,6 +313,7 @@ def _format_results(results) -> list[RetrievalResultOut]:
                 retrieval_source=r.retrieval_source,
                 semantic_score=r.semantic_score,
                 graph_path=r.graph_path,
+                keyword_score=getattr(r, "keyword_score", None),
                 memory_type=str(rec.memory_type) if rec else None,
                 title=rec.title if rec else None,
                 content_preview=rec.content[:300] if rec else None,

@@ -4,14 +4,14 @@ import logging
 from typing import Optional
 
 from fastapi import Depends
-from neo4j import Driver, GraphDatabase
+from neo4j import Driver
 from qdrant_client import QdrantClient
 
 from app.core.config import Settings, get_settings
+from app.core.connections import get_connections
 from app.db.session import SessionLocal
-from app.embeddings.fake import DeterministicFakeEmbedding
+from app.embeddings.factory import create_embedding_provider
 from app.embeddings.provider import EmbeddingProvider
-from app.graph.index import GraphProjectionError
 from app.graph.neo4j_impl import Neo4jGraphMemoryIndex
 from app.graphrag.provider import LLMProvider
 from app.graphrag.providers import create_llm_provider
@@ -30,49 +30,40 @@ logger = logging.getLogger(__name__)
 # Qdrant / Semantic dependencies
 # ---------------------------------------------------------------------------
 
+_embedding_provider: Optional[EmbeddingProvider] = None
+
+
 def get_embedding_provider() -> EmbeddingProvider:
-    """Return embedding provider (deterministic fake for now)."""
-    return DeterministicFakeEmbedding()
+    """Return the configured embedding provider (see app/embeddings/factory.py)."""
+    global _embedding_provider
+    if _embedding_provider is None:
+        _embedding_provider = create_embedding_provider()
+    return _embedding_provider
 
 
 def get_qdrant_client(settings: Settings = Depends(get_settings)) -> QdrantClient:
     """
-    Create Qdrant client.
+    Return the process-wide cached Qdrant client.
 
     Raises:
-        SemanticIndexError: If connection fails (allows graceful degradation)
+        SemanticIndexError: If Qdrant is unavailable (allows graceful degradation).
+            Fails fast during the retry cool-down instead of re-paying connect timeouts.
     """
-    try:
-        client = QdrantClient(settings.QDRANT_URL)
-        client.get_collections()
-        logger.info(f"Connected to Qdrant at {settings.QDRANT_URL}")
-        return client
-    except Exception as exc:
-        logger.error(f"Failed to connect to Qdrant: {exc}")
-        raise SemanticIndexError(f"Qdrant unavailable: {exc}") from exc
+    conns = get_connections()
+    client = conns.qdrant_client()
+    if client is None:
+        raise SemanticIndexError(f"Qdrant unavailable: {conns.probe('qdrant').get('error')}")
+    return client
 
 
 def get_semantic_index(
     embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
-    settings: Settings = Depends(get_settings),
 ) -> Optional[QdrantSemanticIndex]:
-    """Create semantic index if Qdrant available, else return None."""
-    try:
-        qdrant_client = get_qdrant_client(settings)
-    except SemanticIndexError as exc:
-        logger.warning(f"Semantic indexing disabled (Qdrant unavailable): {exc}")
-        return None
-
-    try:
-        index = QdrantSemanticIndex(
-            qdrant_client=qdrant_client,
-            embedding_provider=embedding_provider,
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-        )
-        return index
-    except SemanticIndexError as exc:
-        logger.warning(f"Failed to initialize semantic index: {exc}")
-        return None
+    """Cached semantic index if Qdrant is available, else None."""
+    index = get_connections().semantic_index(embedding_provider)
+    if index is None:
+        logger.debug("Semantic index unavailable (Qdrant down or in retry cool-down)")
+    return index
 
 
 def get_semantic_indexing_service(
@@ -93,38 +84,14 @@ def get_semantic_indexing_service(
 # Neo4j / Graph dependencies
 # ---------------------------------------------------------------------------
 
-def get_neo4j_driver(settings: Settings = Depends(get_settings)) -> Optional[Driver]:
-    """
-    Create Neo4j driver.
-    Returns None if Neo4j is unavailable (graceful degradation).
-    """
-    try:
-        driver = GraphDatabase.driver(
-            settings.NEO4J_URI,
-            auth=(settings.NEO4J_USERNAME, settings.NEO4J_PASSWORD),
-        )
-        driver.verify_connectivity()
-        logger.info(f"Connected to Neo4j at {settings.NEO4J_URI}")
-        return driver
-    except Exception as exc:
-        logger.warning(f"Neo4j unavailable; graph projection disabled: {exc}")
-        return None
+def get_neo4j_driver() -> Optional[Driver]:
+    """Return the process-wide cached Neo4j driver, or None if unavailable."""
+    return get_connections().neo4j_driver()
 
 
-def get_graph_memory_index(
-    driver: Optional[Driver] = Depends(get_neo4j_driver),
-    settings: Settings = Depends(get_settings),
-) -> Optional[Neo4jGraphMemoryIndex]:
-    """Create Neo4j graph index, bootstrapping constraints. Returns None if unavailable."""
-    if driver is None:
-        return None
-    try:
-        index = Neo4jGraphMemoryIndex(driver=driver, database=settings.NEO4J_DATABASE)
-        index.bootstrap_constraints()
-        return index
-    except GraphProjectionError as exc:
-        logger.warning(f"Failed to initialize graph index: {exc}")
-        return None
+def get_graph_memory_index() -> Optional[Neo4jGraphMemoryIndex]:
+    """Cached Neo4j graph index (constraints bootstrapped once per process), or None."""
+    return get_connections().graph_index()
 
 
 def get_graph_projection_service(
