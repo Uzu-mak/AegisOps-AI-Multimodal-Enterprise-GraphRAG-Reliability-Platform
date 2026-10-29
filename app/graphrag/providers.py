@@ -176,6 +176,9 @@ class OpenAIProvider(LLMProvider):
 
         self._model = model
         self._timeout_seconds = timeout_seconds
+        # Reasoning models (for example the GPT-5 family) reject `temperature`.
+        # Learned on the first refusal, then omitted for this provider's model.
+        self._send_temperature = True
 
     def generate(
         self,
@@ -191,14 +194,25 @@ class OpenAIProvider(LLMProvider):
             for m in messages
         ]
 
+        request: dict[str, Any] = {
+            "model": self._model,
+            "input": response_input,
+            "max_output_tokens": max_tokens,
+            "timeout": self._timeout_seconds,
+        }
+        if self._send_temperature:
+            request["temperature"] = temperature
+
         try:
-            response = self._client.responses.create(
-                model=self._model,
-                input=response_input,
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-                timeout=self._timeout_seconds,
-            )
+            try:
+                response = self._client.responses.create(**request)
+            except Exception as exc:
+                message = str(exc).lower()
+                if "temperature" not in request or "temperature" not in message or "unsupported" not in message:
+                    raise
+                self._send_temperature = False
+                request.pop("temperature")
+                response = self._client.responses.create(**request)
             content = _extract_response_text(response)
             prompt_tokens, completion_tokens = _usage_tokens(response)
             return LLMResponse(

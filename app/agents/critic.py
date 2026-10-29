@@ -50,7 +50,15 @@ class RuleBasedCritic:
                 invalid_citations.append(f"[Memory {ref}]")
 
         # Find sentences with no evidence reference
-        sentences = re.split(r"[.!?]+", answer)
+        # Models usually cite after the full stop ("...seal. [Memory 4]").
+        # Move such trailing citations before the stop so they count for the
+        # sentence they follow, not as a fragment of their own.
+        normalized = re.sub(
+            r"([.!?]+)(\s*)((?:\[Memory\s+\d+\][\s,;]*)+)",
+            lambda m: " " + m.group(3).strip() + m.group(1) + m.group(2),
+            answer,
+        )
+        sentences = re.split(r"[.!?]+", normalized)
         unsupported: list[str] = []
         for sent in sentences:
             sent = sent.strip()

@@ -16,6 +16,12 @@ if ENV_FILE.exists():
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip())
 
+# Tests never call a paid, non-deterministic answer model unless asked to:
+# the deterministic provider gives repeatable answers and citation checks.
+# Set AEGISOPS_TEST_REAL_LLM=1 to exercise the configured model instead.
+if os.getenv("AEGISOPS_TEST_REAL_LLM") != "1":
+    os.environ["LLM_PROVIDER"] = "test"
+
 
 # Integration fixtures delete rows: never let a default developer DB receive them.
 def pytest_collection_modifyitems(config, items):

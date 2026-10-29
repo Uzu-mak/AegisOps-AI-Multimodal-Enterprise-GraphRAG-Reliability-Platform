@@ -78,7 +78,9 @@ class GraphRAGPipeline:
                     text=question,
                     mode=self.retrieval_mode,
                     anchor_memory_id=anchor_id,
-                    final_limit=self.context_limit,
+                    # Starting from a record: take a wider pool so the anchor's
+                    # incident and asset records survive until they are scoped.
+                    final_limit=max(self.context_limit * 4, 20) if anchor_id else self.context_limit,
                     keyword_fallback=True,
                 )
             )
@@ -86,7 +88,7 @@ class GraphRAGPipeline:
             logger.warning(f"GraphRAG retrieval failed: {exc}")
             results = []
         if anchor_memory_id:
-            results = self._scope_to_anchor(results, anchor_memory_id)
+            results = self._scope_to_anchor(results, anchor_memory_id)[: self.context_limit]
         return results, (time.perf_counter() - t0) * 1000
 
     def _scope_to_anchor(self, results: list[RetrievalResult], anchor_memory_id: str) -> list[RetrievalResult]:
@@ -114,16 +116,20 @@ class GraphRAGPipeline:
                 by_id.setdefault(extra.memory_id, extra)
         by_id.pop(anchor.id, None)
 
-        def same_context(r: RetrievalResult) -> bool:
+        def context_tier(r: RetrievalResult) -> int:
+            # 0 = same incident, 1 = same asset (e.g. an earlier incident on the
+            # same machine), 2 = everything else. Retrieval order is kept within
+            # a tier because sorted() is stable.
             rec = r.canonical_record
             if rec is None:
-                return False
-            if anchor.incident_id:
-                return rec.incident_id == anchor.incident_id
-            return bool(anchor.asset_id) and rec.asset_id == anchor.asset_id
+                return 2
+            if anchor.incident_id and rec.incident_id == anchor.incident_id:
+                return 0
+            if anchor.asset_id and rec.asset_id == anchor.asset_id:
+                return 1
+            return 2
 
-        ordered = list(by_id.values())
-        scoped = [r for r in ordered if same_context(r)] + [r for r in ordered if not same_context(r)]
+        scoped = sorted(by_id.values(), key=context_tier)
         return [RetrievalResult(memory_id=anchor.id, retrieval_source="anchor", canonical_record=anchor)] + scoped
 
     def answer(self, question: str, results: list[RetrievalResult], retrieval_ms: float = 0.0) -> GraphRAGResponse:

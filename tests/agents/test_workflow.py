@@ -58,6 +58,28 @@ class TestRuleBasedCritic:
         result = critic.verify(answer, evidence)
         assert result.is_supported is False
 
+    def test_citation_after_full_stop_supports_that_sentence(self):
+        critic = RuleBasedCritic()
+        evidence = self._make_evidence(2)
+        answer = (
+            "The vacuum port seal on line 2 was hardened and cracked. [Memory 1]\n\n"
+            "All port seals on lines 1 through 3 were replaced afterwards. [Memory 1][Memory 2]"
+        )
+        result = critic.verify(answer, evidence)
+        assert result.is_supported is True
+        assert result.unsupported_claims == []
+
+    def test_uncited_sentence_still_flagged_beside_cited_ones(self):
+        critic = RuleBasedCritic()
+        evidence = self._make_evidence(2)
+        answer = (
+            "The vacuum port seal on line 2 was hardened and cracked. [Memory 1] "
+            "The operators also changed the resin supplier last spring."
+        )
+        result = critic.verify(answer, evidence)
+        assert result.is_supported is False
+        assert result.unsupported_claims == ["The operators also changed the resin supplier last spring"]
+
 
 class TestAgentWorkflow:
 
