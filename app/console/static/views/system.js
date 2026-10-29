@@ -1,8 +1,9 @@
 import { notice, num, pageHead, pct, serviceChip, skeleton, stateChip } from "../components/ui.js";
 import { render } from "../console.js";
-import { API, api } from "../lib/api.js";
+import { API, api, fetchAllMemories } from "../lib/api.js";
+import { schematic } from "../components/schematic.js";
 import { h, put, s } from "../lib/dom.js";
-import { href, main, refreshHealth } from "../lib/state.js";
+import { href, main, refreshHealth, services } from "../lib/state.js";
 
 /* ------------------------------------------------------------ system */
 
@@ -44,7 +45,10 @@ export function metricTable(title, group, id) {
 export async function viewSystem() {
   const head = pageHead("System health", "Which capabilities are available right now, what powers them, and how far behind the projections are. Unmeasured values are shown as such, never estimated.");
   put(main, head, skeleton());
-  const [health, obs, proj] = await Promise.all([refreshHealth(), api("/system/observability"), api("/system/projection-metrics")]);
+  const [health, obs, proj, all, outbox] = await Promise.all([refreshHealth(), api("/system/observability"), api("/system/projection-metrics"), fetchAllMemories(), api("/system/outbox-stats")]);
+  const items = all.items || [];
+  const pipeline = schematic({ svc: services(), total: items.length, active: items.filter((m) => m.status === "active").length,
+    pending: outbox.ok ? outbox.data?.summary?.pending ?? 0 : null, failed: outbox.ok ? outbox.data?.summary?.failed ?? 0 : null });
   const svc = health.services || {};
   const kafkaOn = health.integrations?.kafka_enabled;
 
@@ -81,7 +85,7 @@ export async function viewSystem() {
 
   const P = proj.ok ? proj.data : null;
   const O = obs.ok ? obs.data : null;
-  put(main, head, svcTable,
+  put(main, head, pipeline, svcTable,
     !proj.ok ? notice("crit", "Projection metrics unavailable", proj.error) : null,
     h("div", { class: "grid grid-metrics" },
       P ? metricTable("Projection outbox", P.kafka_outbox, "projection") : null,

@@ -67,7 +67,11 @@ export async function viewMemories(params) {
       h("tbody", null, slice.map((m) => {
         const open = () => showMemory(m.id);
         return h("tr", { class: "is-clickable", tabindex: "0", onclick: open, onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } },
-          h("td", null, h("span", { class: "cell-title" }, m.title), h("span", { class: "cell-sub" }, m.content.length > 120 ? `${m.content.slice(0, 120)}…` : m.content)),
+          h("td", null, h("span", { class: "cell-title" }, m.title),
+            m.source_type === "investigation" || m.is_synthetic ? h("span", { class: "row-tags" },
+              m.source_type === "investigation" ? h("span", { class: "tag tag-confirmed" }, "Confirmed finding") : null,
+              m.is_synthetic ? h("span", { class: "tag" }, "Sample data") : null) : null,
+            h("span", { class: "cell-sub" }, m.content.length > 120 ? `${m.content.slice(0, 120)}…` : m.content)),
           h("td", null, typeLabel(m.memory_type)),
           h("td", null, lifecycleChip(m.status)),
           h("td", null, m.asset_id || "—"),

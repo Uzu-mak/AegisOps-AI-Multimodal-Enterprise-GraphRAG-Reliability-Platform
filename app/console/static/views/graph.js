@@ -43,34 +43,37 @@ export async function viewGraph(params) {
   if (capable("neo4j")) run();
 }
 
+// The API returns which records are linked, not why, so links are grouped by
+// the shared field that can be read from the records themselves.
+const GROUPS = [
+  ["incident", "Same incident", (a, m) => a.incident_id && m.incident_id === a.incident_id],
+  ["supersession", "Replaces or replaced by", (a, m) => m.supersedes_memory_id === a.id || a.supersedes_memory_id === m.id],
+  ["asset", "Same asset, other incidents", (a, m) => a.asset_id && m.asset_id === a.asset_id],
+  ["other", "Linked through a line, source or a second step", () => true],
+];
+
 export function drawGraph(anchor, related) {
   if (!related.length) return empty("No linked records", "This record doesn't share an asset, incident, line or source with any other record yet.");
-  const W = 900, H = 520, cx = W / 2, cy = H / 2;
-  const R = Math.min(210, 90 + related.length * 8);
-  const svg = s("svg", { class: "graph-canvas", viewBox: `0 0 ${W} ${H}`, role: "group", "aria-label": `${anchor.title} and ${related.length} linked records` });
-  const pos = related.map((m, i) => {
-    const a = (i / related.length) * Math.PI * 2 - Math.PI / 2;
-    return { m, x: cx + Math.cos(a) * R * 1.45, y: cy + Math.sin(a) * R };
-  });
-  for (const p of pos) svg.append(s("line", { class: "edge", x1: cx, y1: cy, x2: p.x, y2: p.y }));
-  const gnode = (m, x, y, isAnchor) => {
-    const label = m.title.length > 34 ? `${m.title.slice(0, 33)}…` : m.title;
-    const g = s("g", { class: `gnode${isAnchor ? " is-anchor" : ""}${m.status !== "active" ? " is-inactive" : ""}`, transform: `translate(${x} ${y})`, tabindex: "0", role: "button", "aria-label": `${m.title}, ${typeLabel(m.memory_type)}, ${m.status}` });
-    g.append(s("circle", { r: isAnchor ? 14 : 9 }), s("text", { x: 0, y: isAnchor ? 34 : 26, "text-anchor": "middle" }, label));
-    const open = () => showMemory(m.id);
-    g.addEventListener("click", open);
-    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
-    return g;
-  };
-  for (const p of pos) svg.append(gnode(p.m, p.x, p.y, false));
-  svg.append(gnode(anchor, cx, cy, true));
-
-  const table = h("div", { class: "table-wrap" }, h("table", null,
-    h("caption", null, "Linked records as a table"),
-    h("thead", null, h("tr", null, ["Record", "Type", "Status", "Asset", "Incident"].map((c) => h("th", { scope: "col" }, c)))),
-    h("tbody", null, related.map((m) => h("tr", null,
-      h("td", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(m.id) }, m.title)),
-      h("td", null, typeLabel(m.memory_type)), h("td", null, lifecycleChip(m.status)), h("td", null, m.asset_id || "—"),
-      h("td", null, m.incident_id ? navLink(m.incident_id, "incidents", { id: m.incident_id }) : "—"))))));
-  return h("div", { class: "stack" }, svg, table);
+  const buckets = GROUPS.map(([key, label]) => ({ key, label, items: [] }));
+  for (const m of related) {
+    const i = GROUPS.findIndex(([, , test]) => test(anchor, m));
+    buckets.at(i).items.push(m);
+  }
+  const row = (m) => h("li", { class: m.status !== "active" ? "is-inactive" : null },
+    h("span", { class: "tag" }, typeLabel(m.memory_type)),
+    h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(m.id) }, m.title),
+    m.status !== "active" ? lifecycleChip(m.status) : null,
+    m.incident_id && m.incident_id !== anchor.incident_id ? navLink(m.incident_id, "incidents", { id: m.incident_id }, "rel-incident") : null);
+  return h("div", { class: "rel-map" },
+    h("section", { class: "rel-anchor", "aria-label": "Starting record" },
+      h("p", { class: "prov-label" }, "Starting record"),
+      h("h2", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(anchor.id) }, anchor.title)),
+      h("p", { class: "queue-meta" }, h("span", { class: "tag" }, typeLabel(anchor.memory_type)),
+        anchor.asset_id ? h("span", null, `Asset ${anchor.asset_id}`) : null,
+        anchor.incident_id ? h("span", null, `Incident ${anchor.incident_id}`) : null),
+      h("p", { class: "toolbar-note" }, `${related.length} linked record${related.length === 1 ? "" : "s"}`)),
+    h("div", { class: "rel-groups" }, buckets.filter((b) => b.items.length).map((b) =>
+      h("section", { class: "rel-group", "aria-labelledby": `rel-${b.key}` },
+        h("h3", { id: `rel-${b.key}` }, b.label, h("span", { class: "rel-count" }, String(b.items.length))),
+        h("ul", null, b.items.map(row))))));
 }

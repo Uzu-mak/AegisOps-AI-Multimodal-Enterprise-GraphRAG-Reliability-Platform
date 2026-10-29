@@ -85,7 +85,13 @@ export async function viewEvaluation() {
     put(results,
       unavailable.length ? notice("warn", "Some modes didn't run", unavailable.map(([m, why]) => `${MODE_LABEL[m]}: ${why}.`).join(" ") + " They are reported as not measured, not as zero.", [navLink("Open System health", "system", {}, "btn")]) : null,
       h("section", { class: "panel" },
-        h("div", { class: "panel-head" }, h("h2", null, "Retrieval"), h("p", null, `${res.embedding_model}; mean over labelled questions`)),
+        h("div", { class: "panel-head" }, h("h2", null, "Retrieval"),
+          h("p", null, `Mean over ${res.cases ? new Set(res.cases.map((c) => c.question)).size : evalState.cases.length} labelled questions, top ${k}, embedding ${res.embedding_model}`)),
+        (() => {
+          const n = res.cases ? new Set(res.cases.map((c) => c.question)).size : evalState.cases.length;
+          return n && n < 20 ? notice("info", `Small sample: ${n} question${n === 1 ? "" : "s"}`,
+            `Each question moves recall by about ${Math.round(100 / n)} percentage points, so compare modes with care and label more questions before quoting results.`) : null;
+        })(),
         h("div", { class: "table-wrap" }, h("table", null,
           h("thead", null, h("tr", null, ["Mode", "Recall at 5", `Recall at ${k}`, `MRR at ${k}`, "Cited sentences", "Latency p50"].map((c, i) => h("th", { scope: "col", class: i ? "num" : null }, c)))),
           h("tbody", null, res.modes_run.map((m) => {
@@ -120,6 +126,7 @@ export async function viewEvaluation() {
   })).join("\n") + "\n";
 
   put(main, head,
+    notice("info", "Questions are saved in this browser only", "They aren't shared with other people or devices, and clearing site data removes them. Export queries.jsonl to keep them with the project."),
     !all.ok ? notice("crit", "Records can't be loaded", all.error) : null,
     pendingPanel(),
     h("div", { class: "grid grid-2" },

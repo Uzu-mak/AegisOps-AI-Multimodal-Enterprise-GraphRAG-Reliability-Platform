@@ -18,6 +18,26 @@ export async function viewSearch(params) {
       h("input", { type: "radio", name: "mode", value: v, checked: v === mode }), h("span", null, l)))));
   const inactive = h("label", { class: "check" }, h("input", { type: "checkbox", name: "inactive" }), "Include archived and disputed");
   const go2 = h("button", { class: "btn btn-primary", type: "submit" }, "Search");
+  // Administrators: the same query through all three modes, side by side.
+  const compareBtn = admin ? h("button", { class: "btn", type: "button", onclick: async () => {
+    const text = query.value.trim();
+    if (!text) return query.focus();
+    busy(compareBtn, true);
+    const runs = await Promise.all(modes.map(([m]) => api("/search/hybrid", { method: "POST", body: { query: text, mode: m, limit: 10, include_inactive: inactive.querySelector("input").checked } })));
+    busy(compareBtn, false);
+    const seenIn = new Map();
+    runs.forEach((r) => (r.ok ? r.data.results || [] : []).forEach((x) => seenIn.set(x.memory_id, (seenIn.get(x.memory_id) || 0) + 1)));
+    put(out, h("section", { class: "panel", "aria-labelledby": "cmp-title" },
+      h("div", { class: "panel-head" }, h("h2", { id: "cmp-title" }, "Modes compared"), h("p", null, "Top 10 per mode. Bold records were found by all three.")),
+      h("div", { class: "compare-grid" }, modes.map(([m, label], i) => {
+        const r = runs.at(i);
+        return h("section", { class: "compare-col", "aria-label": label },
+          h("h3", null, label, r.ok ? h("span", { class: "cell-sub" }, `${(r.data.results || []).length} results, ${num(r.data.latency_ms, 0)} ms`) : null),
+          !r.ok ? notice("warn", "This mode didn't run", r.error)
+            : h("ol", null, (r.data.results || []).map((x) => h("li", { class: seenIn.get(x.memory_id) === modes.length ? "is-common" : null },
+                h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(x.memory_id) }, x.title || shortId(x.memory_id))))));
+      }))));
+  } }, "Compare modes") : null;
 
   const form = h("form", { class: "panel", role: "search", onsubmit: async (e) => {
     e.preventDefault();
@@ -55,7 +75,7 @@ export async function viewSearch(params) {
   } },
     h("div", { class: "toolbar" },
       h("div", { class: "field field-grow" }, h("label", { for: "s-q" }, "Search for"), query),
-      seg, inactive, go2));
+      seg, inactive, go2, compareBtn));
 
   const notes = [];
   if (!admin && !capable("qdrant", "neo4j")) notes.push(notice("warn", "Search is limited right now", "Some matching records may not appear until the service recovers. Try again shortly, or find by text in Records."));

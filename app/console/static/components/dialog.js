@@ -5,8 +5,11 @@ import { h, put } from "../lib/dom.js";
 export const dialog = document.getElementById("dialog");
 export let dialogReturnFocus = null;
 
-export function openDialog(titleText, body, foot) {
-  dialogReturnFocus = document.activeElement;
+/** Forms open as a centred dialog; records open as a drawer from the right
+ *  so the page they came from stays in view. */
+export function openDialog(titleText, body, foot, { drawer = false } = {}) {
+  if (!dialog.open) dialogReturnFocus = document.activeElement;
+  dialog.classList.toggle("is-drawer", drawer);
   const inner = dialog.querySelector(".dialog-inner");
   put(inner, 
     h("div", { class: "dialog-head" },

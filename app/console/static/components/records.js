@@ -1,5 +1,5 @@
 import { closeDialog, openDialog } from "./dialog.js";
-import { TYPE_LABEL, busy, empty, fmtWhen, lifecycleChip, notice, pct, shortId, skeleton, toast, typeLabel } from "./ui.js";
+import { TYPE_LABEL, busy, empty, fmtWhen, lifecycleChip, notice, pct, shortId, skeleton, stateChip, toast, typeLabel } from "./ui.js";
 import { render } from "../console.js";
 import { api, fetchAllMemories, showSignIn } from "../lib/api.js";
 import { h, put, s } from "../lib/dom.js";
@@ -8,10 +8,10 @@ import { navLink, refreshHealth } from "../lib/state.js";
 /* ------------------------------------------------------- record dialogs */
 
 export async function showMemory(id, { onChange } = {}) {
-  openDialog("Loading record", skeleton());
+  openDialog("Loading record", skeleton(), null, { drawer: true });
   const r = await api(`/memories/${id}`);
   if (!r.ok) {
-    openDialog("Record unavailable", notice("crit", "Couldn't load this record", r.error));
+    openDialog("Record unavailable", notice("crit", "Couldn't load this record", r.error), null, { drawer: true });
     return;
   }
   const m = r.data;
@@ -45,7 +45,7 @@ export async function showMemory(id, { onChange } = {}) {
   const codes = wo ? [["Problem", wo.problem], ["Cause", wo.cause], ["Remedy", wo.remedy]].filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(", ") : null;
   const body = h("div", null,
     h("div", { class: "evidence-head" }, lifecycleChip(m.status), h("span", { class: "tag" }, typeLabel(m.memory_type)),
-      m.source_type === "investigation" ? h("span", { class: "tag" }, "Recorded from an investigation") : null,
+      m.source_type === "investigation" ? stateChip("Confirmed finding", "normal") : null,
       wo ? h("span", { class: "tag" }, "Imported work order") : null,
       m.is_synthetic ? h("span", { class: "tag" }, "Sample data") : null),
     h("p", { class: "record-body" }, m.content),
@@ -81,7 +81,7 @@ export async function showMemory(id, { onChange } = {}) {
     isActive ? h("button", { class: "btn btn-danger", type: "button", onclick: () => lifecycle("dispute", "Dispute", "Record marked disputed") }, "Dispute") : null,
     m.status !== "archived" && m.status !== "superseded" ? h("button", { class: "btn btn-danger", type: "button", onclick: () => lifecycle("archive", "Archive", "Record archived") }, "Archive") : null,
   ];
-  openDialog(m.title, body, foot);
+  openDialog(m.title, body, foot, { drawer: true });
 }
 
 /** Evidence list for a finding; titles are filled in as they load. */

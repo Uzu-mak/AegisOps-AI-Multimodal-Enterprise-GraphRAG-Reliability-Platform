@@ -81,7 +81,17 @@ export async function viewImport() {
     run(true, previewBtn);
   });
 
+  // Where the operator is: 1 choose, 2 check the preview, 3 import.
+  const stepNames = ["Choose an export", "Check the preview", "Import"];
+  const stepper = h("ol", { class: "stepper", "aria-label": "Import progress" }, stepNames.map((n, i) => h("li", null, h("span", { class: "stepper-n", "aria-hidden": "true" }, String(i + 1)), n)));
+  const setStep = (active, done = false) => [...stepper.children].forEach((li, i) => {
+    li.className = i < active || (done && i === active) ? "is-done" : i === active ? "is-current" : "";
+    if (i === active && !done) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+  });
+  setStep(0);
+
   const showPreview = (d) => {
+    setStep(1);
     const toWrite = d.missing_required.length ? 0 : d.new + d.changed;
     const columnSelect = (m) => {
       const sel = h("select", { "aria-label": `CSV column for ${m.label}` },
@@ -144,6 +154,7 @@ export async function viewImport() {
   };
 
   const showDone = (d) => {
+    setStep(2, true);
     const w = d.written.created + d.written.superseded;
     put(result, notice("info", `Imported ${num(d.written.created)} new and ${num(d.written.superseded)} updated work orders`,
       `${num(d.unchanged)} were already up to date. The records are in PostgreSQL now and findable by keyword; ` +
@@ -153,7 +164,7 @@ export async function viewImport() {
     refreshHealth();
   };
 
-  put(main, head,
+  put(main, head, stepper,
     h("section", { class: "panel", "aria-labelledby": "imp-src" },
       h("div", { class: "panel-head" }, h("h2", { id: "imp-src" }, "Choose an export"),
         h("p", null, "One row per work order. Re-importing a newer export is safe: unchanged work orders are skipped and changed ones keep their history.")),
