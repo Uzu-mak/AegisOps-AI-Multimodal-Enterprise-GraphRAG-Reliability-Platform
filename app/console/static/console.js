@@ -2,7 +2,8 @@ import { dialog, openDialog } from "./components/dialog.js";
 import { memoryForm } from "./components/records.js";
 import { notice, pageHead } from "./components/ui.js";
 import { h, put, s } from "./lib/dom.js";
-import { href, main, refreshHealth, state } from "./lib/state.js";
+import { href, main, refreshHealth, renderServiceStrip, state } from "./lib/state.js";
+import { ADMIN_ROUTES, isAdmin, session, setView } from "./lib/session.js";
 import { viewEvaluation } from "./views/evaluation.js";
 import { viewGraph } from "./views/graph.js";
 import { viewImport } from "./views/import.js";
@@ -53,7 +54,13 @@ export async function render() {
   if (!state.health) await refreshHealth();
   if (token !== renderToken) return;
   try {
-    await route.view(params);
+    if (ADMIN_ROUTES.has(name) && !isAdmin()) {
+      put(main, pageHead(route.title), notice("info", "This page is for administrators",
+        "You're viewing AegisOps as a plant user. Switch the view back to administrator to open it.",
+        [h("button", { class: "btn", type: "button", onclick: () => { setView("admin"); syncView(); render(); } }, "Switch to administrator view")]));
+    } else {
+      await route.view(params);
+    }
   } catch (err) {
     console.error(err);
     put(main, pageHead(route.title), notice("crit", "This page hit an unexpected error", String(err?.message || err), [h("button", { class: "btn", type: "button", onclick: render }, "Try again")]));
@@ -85,6 +92,35 @@ function currentTheme() {
 function syncTheme() {
   themeBtn.setAttribute("aria-pressed", String(currentTheme() === "dark"));
 }
+const densityBtn = document.getElementById("density-toggle");
+function syncDensity() {
+  densityBtn.setAttribute("aria-pressed", String(document.documentElement.dataset.density === "compact"));
+}
+densityBtn.addEventListener("click", () => {
+  const compact = document.documentElement.dataset.density !== "compact";
+  if (compact) document.documentElement.dataset.density = "compact"; else delete document.documentElement.dataset.density;
+  try { localStorage.setItem("aegis-density", compact ? "compact" : "comfortable"); } catch {}
+  syncDensity();
+});
+syncDensity();
+
+const viewBtn = document.getElementById("view-toggle");
+function syncView() {
+  document.documentElement.dataset.view = session.view;
+  viewBtn.setAttribute("aria-pressed", String(!isAdmin()));
+  const local = !sessionStorage.getItem("aegis-token");
+  document.getElementById("view-meta").textContent = isAdmin()
+    ? (local ? "Local mode: administrator view" : "Administrator view")
+    : "Plant-user view: administration hidden";
+}
+viewBtn.addEventListener("click", () => {
+  setView(isAdmin() ? "plant" : "admin");
+  syncView();
+  renderServiceStrip();
+  render();
+});
+syncView();
+
 themeBtn.addEventListener("click", () => {
   const next = currentTheme() === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;

@@ -3,6 +3,7 @@ import { SERVICE_STATE, barList, empty, fmtAgo, lifecycleChip, metaPair, notice,
 import { api, fetchAllMemories } from "../lib/api.js";
 import { add, h, put, s } from "../lib/dom.js";
 import { deriveIncidents, href, main, services, state } from "../lib/state.js";
+import { isAdmin } from "../lib/session.js";
 
 /* ============================================================== VIEWS */
 
@@ -23,13 +24,13 @@ export async function viewOverview() {
 
   put(main,
     head(items.length ? [h("a", { class: "btn btn-primary", href: href("investigate") }, "Investigate")] : null),
-    schematic({ svc: services(), total: items.length, active: active.length, pending, failed }),
+    isAdmin() ? schematic({ svc: services(), total: items.length, active: active.length, pending, failed }) : null,
     readouts([
       { label: "Open incidents", value: open.length, note: "Incidents without an active resolution", sev: open.length ? "warn" : null, to: href("incidents") },
       { label: "Active records", value: active.length, note: `${items.length - active.length} archived, disputed or superseded`, to: href("memories") },
-      { label: "Waiting to project", value: pending, note: "Outbox events not yet in Qdrant or Neo4j", sev: pending > 0 ? "warn" : null, to: href("system") },
-      { label: "Failed projections", value: failed, note: "Gave up after retries; needs a look", sev: failed > 0 ? "crit" : null, to: href("system") },
-    ]),
+      { label: "Waiting to project", value: pending, note: "Outbox events not yet in Qdrant or Neo4j", sev: pending > 0 ? "warn" : null, to: href("system"), admin: true },
+      { label: "Failed projections", value: failed, note: "Gave up after retries; needs a look", sev: failed > 0 ? "crit" : null, to: href("system"), admin: true },
+    ].filter((r) => !r.admin || isAdmin())),
   );
 
   if (!items.length) return add(main, sampleDataEmpty());

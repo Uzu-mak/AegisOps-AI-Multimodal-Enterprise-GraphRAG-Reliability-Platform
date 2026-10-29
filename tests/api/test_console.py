@@ -21,7 +21,7 @@ def test_console_shell_and_assets_are_served():
     assert 'lang="en"' in page.text
     assert 'class="skip-link"' in page.text
     for asset in ("console.css", "console.js"):
-        assert asset in page.text
+        assert f"{asset}?v=" in page.text
         r = client.get(f"/console/{asset}")
         assert r.status_code == 200 and len(r.text) > 1000
 
@@ -49,3 +49,18 @@ def test_every_console_module_is_served():
                     resolved.append(part)
             todo.append("/".join(resolved))
     assert {"lib/api.js", "lib/dom.js", "components/ui.js", "views/investigate.js"} <= seen
+
+
+def test_console_asset_stamps_are_current():
+    """index.html must version every module (scripts/stamp_console.py), or
+    browsers can keep running stale console code after a rebuild."""
+    import importlib.util
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parents[2] / "scripts" / "stamp_console.py"
+    spec = importlib.util.spec_from_file_location("stamp_console", script)
+    stamp = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(stamp)
+    assert stamp.main(["--check"]) == 0, "run: python scripts/stamp_console.py"
+    page = TestClient(app).get("/console/").text
+    assert '<script type="importmap">' in page and '"./console.js": "./console.js?v=' in page

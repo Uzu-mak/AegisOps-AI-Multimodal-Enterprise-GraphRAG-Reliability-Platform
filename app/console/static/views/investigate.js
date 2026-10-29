@@ -1,9 +1,11 @@
 import { closeDialog, openDialog } from "../components/dialog.js";
 import { clearInvalid, formField, markInvalid, memoryForm, showMemory } from "../components/records.js";
-import { SOURCE_LABEL, busy, empty, metaPair, notice, num, pageHead, pct, shortId, skeleton, stateChip, toast, typeLabel } from "../components/ui.js";
-import { api, showSignIn } from "../lib/api.js";
-import { h, put, s } from "../lib/dom.js";
-import { capable, evalState, go, href, main, navLink, services } from "../lib/state.js";
+import { SOURCE_LABEL, busy, empty, fmtWhen, lifecycleChip, metaPair, notice, num, pageHead, pct, scoreBar, shortId, skeleton, stateChip, toast, typeLabel } from "../components/ui.js";
+import { tabs } from "../components/tabs.js";
+import { api, fetchAllMemories, showSignIn } from "../lib/api.js";
+import { h, icon, put, s } from "../lib/dom.js";
+import { capable, evalState, go, href, main, navLink, services, whenOf } from "../lib/state.js";
+import { isAdmin } from "../lib/session.js";
 
 /* ------------------------------------------------------- investigate */
 
@@ -48,76 +50,264 @@ export async function viewInvestigate(params) {
   );
 
   const warnings = [];
-  if (!capable("qdrant") && !capable("neo4j")) warnings.push(notice("warn", "Vector and graph search are offline", "Investigations will use keyword matches from PostgreSQL until Qdrant or Neo4j is back.", [navLink("Open System health", "system", {}, "btn")]));
+  if (!isAdmin()) {
+    if (!capable("qdrant", "neo4j")) warnings.push(notice("warn", "Investigations are limited right now", "Answers may draw on fewer related records until the service recovers."));
+  } else if (!capable("qdrant") && !capable("neo4j")) warnings.push(notice("warn", "Vector and graph search are offline", "Investigations will use keyword matches from PostgreSQL until Qdrant or Neo4j is back.", [navLink("Open System health", "system", {}, "btn")]));
   else if (!capable("neo4j")) warnings.push(notice("warn", "Relationship store is offline", "Investigations use vector matches only; graph links return when Neo4j reconnects."));
-  if (svc.llm?.synthetic) warnings.push(notice("info", "Answers come from the deterministic test provider", "It lists the retrieved records with citations and adds no reasoning. Set LLM_PROVIDER=openai and OPENAI_API_KEY for model-written answers."));
+  if (isAdmin() && svc.llm?.synthetic) warnings.push(notice("info", "Answers come from the deterministic test provider", "It lists the retrieved records with citations and adds no reasoning. Set LLM_PROVIDER=openai and OPENAI_API_KEY for model-written answers."));
 
   put(main, pageHead("Investigate", "Ask about an asset, symptom or incident. The answer cites canonical records, shows how it was built, and is checked before you record anything."), ...warnings, form, out);
   if (q) form.requestSubmit(); else question.focus();
 }
 
-export function renderInvestigation(d, anchor) {
-  const parts = [];
-  const re = /\[Memory\s+(\d+)\]/g;
-  let last = 0;
-  let m;
-  while ((m = re.exec(d.answer))) {
-    parts.push(d.answer.slice(last, m.index));
+// Record types that answer an engineer's questions in order: what failed,
+// what was done, did it work, how to prevent it. The summary is built only
+// from cited records of these types, never from the model's text.
+const SLOTS = [
+  ["diagnosis", "Root cause"],
+  ["maintenance_action", "Corrective action"],
+  ["resolution", "Outcome"],
+  ["recommendation", "Prevention"],
+];
+const ROLE = Object.fromEntries(SLOTS);
+
+function citedNumbers(answer, count) {
+  const cited = new Set();
+  for (const m of String(answer || "").matchAll(/\[Memory\s+(\d+)\]/g)) {
     const n = Number(m[1]);
-    parts.push(n >= 1 && n <= d.evidence.length
-      ? h("a", { class: "cite", href: `#ev-${n}`, onclick: (e) => { e.preventDefault(); const el = document.getElementById(`ev-${n}`); el.scrollIntoView({ block: "center" }); el.focus(); } }, `Record ${n}`)
-      : h("span", { class: "cite" }, `Record ${n} (not in evidence)`));
-    last = m.index + m[0].length;
+    if (n >= 1 && n <= count) cited.add(n);
   }
-  parts.push(d.answer.slice(last));
+  return cited;
+}
 
+function answerParagraphs(text, count, onCite) {
+  return String(text || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => {
+    const parts = [];
+    const re = /\[Memory\s+(\d+)\]/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(p))) {
+      parts.push(p.slice(last, m.index));
+      const n = Number(m[1]);
+      parts.push(n >= 1 && n <= count
+        ? h("a", { class: "cite", href: `#ev-${n}`, onclick: (e) => { e.preventDefault(); onCite(n); } }, `Record ${n}`)
+        : h("span", { class: "cite is-invalid" }, `Record ${n} (not in evidence)`));
+      last = m.index + m[0].length;
+    }
+    parts.push(p.slice(last));
+    return h("p", null, parts);
+  });
+}
+
+export function renderInvestigation(d, anchor) {
+  const admin = isAdmin();
+  const ev = d.evidence || [];
+  const cited = citedNumbers(d.answer, ev.length);
   const critic = d.critic || {};
-  const verdict = critic.is_supported ? stateChip("Citations verified", "normal") : stateChip("Not verified", "warn");
-  const modeNote = d.retrieval_mode === "keyword_fallback"
-    ? notice("warn", "Matched by keywords", "Vector and graph stores returned nothing, so evidence was matched by words in PostgreSQL. Treat the ranking as approximate.")
-    : null;
-  const canRecord = d.evidence.length > 0;
+  const full = new Map(); // memory_id -> canonical record, loaded after render
+  let detail = null;
+  const focusEvidence = (n) => {
+    detail?.select("evidence");
+    const el = document.getElementById(`ev-${n}`);
+    if (el) { el.scrollIntoView({ block: "center" }); el.focus(); }
+  };
 
-  const answer = h("section", { class: "panel", "aria-labelledby": "ans-title" },
-    h("div", { class: "panel-head" }, h("h2", { id: "ans-title" }, "Answer"), h("span", { class: "page-actions" }, d.is_synthetic_response ? stateChip("Test provider", "info") : h("span", { class: "tag" }, d.model_name), verdict)),
-    modeNote,
-    h("p", { class: "answer" }, parts),
-    !critic.is_supported && critic.notes ? h("p", { class: "toolbar-note" }, `Check: ${critic.notes}`) : null,
-    h("div", { class: "page-actions" },
+  /* Header: where this investigation sits, and what was checked. */
+  const crumbs = h("p", { class: "crumbs" }, "Investigation");
+  const chips = h("div", { class: "chip-row" },
+    critic.is_supported ? stateChip("Citations valid", "normal") : stateChip("Needs review", "warn"),
+    d.is_synthetic_response ? stateChip("Test provider", "info") : h("span", { class: "tag" }, d.model_name));
+  const header = h("section", { class: "inv-head", "aria-labelledby": "inv-q" },
+    crumbs, h("h2", { id: "inv-q", class: "inv-question" }, d.question), chips);
+
+  /* What the cited records say: one slot per record type. */
+  const hitsOf = (type) => ev.map((e, i) => ({ e, n: i + 1 })).filter(({ e, n }) => e.memory_type === type && cited.has(n));
+  const anySlot = SLOTS.some(([type]) => hitsOf(type).length);
+  const evLink = (n) => h("a", { href: `#ev-${n}`, onclick: (x) => { x.preventDefault(); focusEvidence(n); } }, `Record ${n}`);
+  const slots = SLOTS.map(([type, role]) => {
+    const hits = hitsOf(type);
+    if (!hits.length) {
+      return h("li", { class: "slot prov is-empty" },
+        h("span", { class: "prov-label" }, role),
+        h("span", { class: "slot-empty" }, `No ${typeLabel(type).toLowerCase()} record cited`));
+    }
+    const [{ e, n }] = hits;
+    return h("li", { class: "slot prov" },
+      h("span", { class: "prov-label" }, `${role} · ${typeLabel(type)} · `, evLink(n), hits.length > 1 ? ` · ${hits.length - 1} more cited` : ""),
+      h("span", { class: "slot-value" }, e.title));
+  });
+  const summary = h("section", { class: "panel", "aria-labelledby": "sum-title" },
+    h("div", { class: "panel-head" }, h("div", null,
+      h("h2", { id: "sum-title" }, "What the cited records say"),
+      h("p", null, "From the records' own types and titles, not from the AI text"))),
+    anySlot
+      ? h("ol", { class: "slots" }, slots)
+      : h("p", { class: "toolbar-note" }, "The answer cites no diagnosis, corrective action, outcome or recommendation record. Read the AI summary and the evidence, and treat any conclusion as unconfirmed."));
+
+  /* Next step: one primary action; confirmed findings on the incident. */
+  const canRecord = ev.length > 0;
+  const incidentSlot = h("span", { class: "next-slot" });
+  const findingsHost = h("div", { class: "findings" }, h("p", { class: "toolbar-note" },
+    anchor ? "Checking for findings on this incident" : "Start from a record to see findings already confirmed on its incident."));
+  const next = h("section", { class: "panel next-step", "aria-labelledby": "next-title" },
+    h("h2", { id: "next-title" }, "Next step"),
+    h("div", { class: "next-actions" },
       h("button", { class: "btn btn-primary", type: "button", disabled: !canRecord, onclick: () => findingForm(d, anchor) }, "Record finding"),
-      h("button", { class: "btn", type: "button", disabled: !canRecord, onclick: () => {
-        evalState.pending = { question: d.question, candidates: d.evidence.map((e) => ({ id: e.memory_id, title: e.title })) };
+      incidentSlot,
+      admin ? h("button", { class: "btn", type: "button", disabled: !canRecord, onclick: () => {
+        evalState.pending = { question: d.question, candidates: ev.map((e) => ({ id: e.memory_id, title: e.title })) };
         go("evaluation");
-      } }, "Add to benchmark"),
-      navLink("Compare search modes", "search", { q: d.question, mode: "hybrid" }, "btn")),
-  );
+      } }, "Add to benchmark") : null,
+      admin ? navLink("Compare search modes", "search", { q: d.question, mode: "hybrid" }, "btn") : null),
+    h("h3", { class: "findings-title" }, "Confirmed findings"),
+    findingsHost);
 
-  const evidence = h("section", { class: "panel", "aria-labelledby": "ev-title" },
-    h("div", { class: "panel-head" }, h("h2", { id: "ev-title" }, "Evidence"), h("p", null, `${d.evidence_count} record${d.evidence_count === 1 ? "" : "s"}`)),
-    d.evidence.length
-      ? h("ol", { class: "evidence" }, d.evidence.map((e, i) => h("li", { id: `ev-${i + 1}`, tabindex: "-1" },
+  /* AI summary: generated text, kept visibly apart from record facts. */
+  const keyword = d.retrieval_mode === "keyword_fallback"
+    ? notice("warn", "Matched by keywords", admin
+      ? "Vector and graph stores returned nothing, so evidence was matched by words in PostgreSQL. Treat the ranking as approximate."
+      : "Related records were matched by their words only, so the ranking is approximate.")
+    : null;
+  const ai = h("section", { class: "panel ai-summary", "aria-labelledby": "ai-title" },
+    h("div", { class: "prov prov-ai" },
+      h("h2", { id: "ai-title", class: "prov-label" }, d.is_synthetic_response
+        ? "Test provider · lists the retrieved records without reasoning"
+        : `AI summary · ${d.model_name} · generated text, check it against the records`),
+      keyword,
+      h("div", { class: "answer" }, answerParagraphs(d.answer, ev.length, focusEvidence)),
+      h("p", { class: "check-line" }, critic.is_supported
+        ? "Citations valid: every factual sentence cites a retrieved record. This checks the citations, not that the conclusion is physically true; only a confirmed finding does that."
+        : `Needs review: ${critic.notes || "the citation check did not pass"}`),
+      !critic.is_supported && critic.unsupported_claims?.length
+        ? h("ul", { class: "unsupported" }, critic.unsupported_claims.map((c) => h("li", null, `No citation: “${c}”`)))
+        : null));
+
+  /* Evidence, as cards with their role and provenance. */
+  const roleOf = (e, n) => (e.retrieval_source === "anchor" ? "Starting record"
+    : cited.has(n) ? ROLE[e.memory_type] || "Cited context" : "Retrieved, not cited");
+  const tagHosts = new Map();
+  const evidenceList = ev.length
+    ? h("ol", { class: "evidence" }, ev.map((e, i) => {
+        const n = i + 1;
+        const tags = h("div", { class: "queue-meta" },
+          h("span", { class: "tag" }, typeLabel(e.memory_type)),
+          metaPair("Asset", e.asset_id), metaPair("Confidence", pct(e.confidence)),
+          admin ? h("span", { class: "tag" }, SOURCE_LABEL[e.retrieval_source] || e.retrieval_source) : null);
+        tagHosts.set(e.memory_id, tags);
+        return h("li", { id: `ev-${n}`, tabindex: "-1", class: "prov" },
           h("div", { class: "evidence-head" },
-            h("span", { class: "evidence-n" }, `Record ${i + 1}`),
+            h("span", { class: "evidence-n" }, `Record ${n}`),
+            h("span", { class: "evidence-role" }, roleOf(e, n)),
             h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(e.memory_id) }, e.title)),
           h("p", null, e.content_preview),
-          h("div", { class: "queue-meta" },
-            h("span", { class: "tag" }, typeLabel(e.memory_type)),
-            h("span", { class: "tag" }, SOURCE_LABEL[e.retrieval_source] || e.retrieval_source),
-            metaPair("Asset", e.asset_id), metaPair("Confidence", pct(e.confidence))))))
-      : empty("No supporting records", "Nothing in canonical storage matched. Rephrase with an asset name or symptom, or record what's missing.",
-          h("button", { class: "btn", type: "button", onclick: () => memoryForm() }, "New record")),
-  );
+          tags);
+      }))
+    : empty("No supporting records", "Nothing in canonical storage matched. Rephrase with an asset name or symptom, or record what's missing.",
+        h("button", { class: "btn", type: "button", onclick: () => memoryForm() }, "New record"));
 
+  /* Timeline of the evidence records, once their dates are loaded. */
+  const timelineHost = h("div", null, skeleton());
+  const drawTimeline = () => {
+    const rows = ev.map((e, i) => ({ n: i + 1, r: full.get(e.memory_id) })).filter((x) => x.r)
+      .sort((a, b) => String(whenOf(a.r)).localeCompare(String(whenOf(b.r))));
+    put(timelineHost, rows.length
+      ? h("ol", { class: "timeline" }, rows.map(({ n, r }) => h("li", { class: `is-${r.memory_type}` },
+          h("span", { class: "timeline-mark", "aria-hidden": "true" }, icon(r.memory_type === "incident" ? "warn" : r.memory_type === "resolution" ? "ok" : "info")),
+          h("p", { class: "timeline-when" }, `${typeLabel(r.memory_type)}, ${fmtWhen(whenOf(r))}, Record ${n}${r.incident_id ? `, ${r.incident_id}` : ""}`),
+          h("h3", { class: "timeline-title" }, h("button", { type: "button", onclick: () => showMemory(r.id) }, r.title)))))
+      : empty("No dated records", "The evidence records couldn't be loaded."));
+  };
+
+  /* Relationships of the starting record (or top evidence), loaded on demand. */
+  const relHost = h("div", null, skeleton());
+  let relLoaded = false;
+  const loadRelationships = async () => {
+    if (relLoaded) return;
+    relLoaded = true;
+    const from = anchor || ev[0]?.memory_id;
+    if (!from) return put(relHost, empty("Nothing to relate", "There's no evidence record to start from."));
+    const r = await api("/search/graph-related", { method: "POST", body: { memory_id: from, max_hops: 2, limit: 20 } });
+    if (!r.ok) return put(relHost, notice("warn", "Relationships are unavailable right now", admin ? r.error : "Try again shortly."));
+    const ids = (r.data.related_memory_ids || []).slice(0, 20);
+    const recs = await Promise.all(ids.map((id) => (full.has(id) ? { ok: true, data: full.get(id) } : api(`/memories/${id}`))));
+    const rows = recs.filter((x) => x.ok).map((x) => x.data);
+    put(relHost, rows.length
+      ? h("div", { class: "stack" },
+          h("ul", { class: "queue" }, rows.map((m) => h("li", null, h("button", { class: "queue-item", type: "button", onclick: () => showMemory(m.id) },
+            h("span", { class: "queue-title" }, m.title),
+            lifecycleChip(m.status),
+            h("span", { class: "queue-meta" }, h("span", { class: "tag" }, typeLabel(m.memory_type)), metaPair("Asset", m.asset_id), metaPair("Incident", m.incident_id)))))),
+          h("div", { class: "page-actions" }, navLink("Open in Relationships", "graph", { anchor: from }, "btn")))
+      : empty("No linked records", "The starting record shares no asset, incident, line or source with other records yet."));
+  };
+
+  /* Diagnostics: how the answer was built. Administrators only. */
   const stepNames = { retrieval: "Retrieve", graph_reasoning: "Follow graph links", synthesis: "Write answer", critic: "Check citations" };
-  const steps = h("section", { class: "panel", "aria-labelledby": "steps-title" },
-    h("div", { class: "panel-head" }, h("h2", { id: "steps-title" }, "How this answer was built"), h("p", null, `${num(d.total_latency_ms, 0)} ms in total`)),
-    h("ol", { class: "steps" }, d.steps.map((st) => h("li", null,
+  const diagnostics = h("div", { class: "stack" },
+    h("p", { class: "latency" },
+      h("span", null, h("strong", null, num(d.total_latency_ms, 0)), "ms total"),
+      h("span", null, h("strong", null, num(d.retrieval_latency_ms, 0)), "ms retrieval"),
+      h("span", null, h("strong", null, num(d.generation_latency_ms, 0)), "ms answer"),
+      h("span", null, `Mode: ${d.retrieval_mode}`)),
+    h("ol", { class: "steps" }, (d.steps || []).map((st) => h("li", null,
       h("strong", null, stepNames[st.type] || st.type),
       h("span", null, st.description),
       st.latency_ms ? h("span", { class: "cell-sub" }, `${num(st.latency_ms, 0)} ms`) : null))),
-  );
+    ev.length ? h("div", { class: "table-wrap" }, h("table", null,
+      h("caption", null, "How each evidence record was found"),
+      h("thead", null, h("tr", null, ["Record", "Found by", "Similarity", "Cited"].map((c) => h("th", { scope: "col" }, c)))),
+      h("tbody", null, ev.map((e, i) => h("tr", null,
+        h("td", null, `Record ${i + 1}: ${e.title}`),
+        h("td", null, SOURCE_LABEL[e.retrieval_source] || e.retrieval_source),
+        h("td", null, typeof e.semantic_score === "number" ? scoreBar(e.semantic_score) : "—"),
+        h("td", null, cited.has(i + 1) ? "Yes" : "No")))))) : null);
 
-  return [h("div", { class: "grid grid-main" }, h("div", { class: "stack" }, answer, steps), evidence)];
+  detail = tabs([
+    { id: "evidence", label: `Evidence · ${ev.length}`, panel: evidenceList },
+    { id: "timeline", label: "Timeline", panel: timelineHost },
+    { id: "relationships", label: "Relationships", panel: relHost, onSelect: loadRelationships },
+    ...(admin ? [{ id: "diagnostics", label: "Diagnostics", panel: diagnostics }] : []),
+  ], "Investigation detail");
+
+  /* Load canonical records for dates, sample flags, findings and context. */
+  (async () => {
+    const ids = [...new Set([...ev.map((e) => e.memory_id), ...(anchor ? [anchor] : [])])];
+    const res = await Promise.all(ids.map((id) => api(`/memories/${id}`)));
+    for (const r of res) if (r.ok) full.set(r.data.id, r.data);
+    const a = anchor ? full.get(anchor) : null;
+    if (a) {
+      put(crumbs, "Investigation",
+        a.asset_id ? [" / ", navLink(a.asset_id, "memories", { asset: a.asset_id, status: "any" })] : null,
+        a.incident_id ? [" / ", navLink(a.incident_id, "incidents", { id: a.incident_id })] : null);
+      if (a.incident_id) put(incidentSlot, navLink(`Open incident ${a.incident_id}`, "incidents", { id: a.incident_id }, "btn"));
+    }
+    if ([...full.values()].some((r) => r.is_synthetic)) chips.append(stateChip("Sample data", "info"));
+    for (const e of ev) {
+      const r = full.get(e.memory_id);
+      const tags = tagHosts.get(e.memory_id);
+      if (!r || !tags) continue;
+      if (r.is_synthetic) tags.append(h("span", { class: "tag" }, "Sample data"));
+      if (r.source_type === "investigation") {
+        tags.append(stateChip("Confirmed finding", "normal"));
+        tags.closest("li")?.classList.add("prov-confirmed");
+      }
+    }
+    drawTimeline();
+    if (!a) {
+      if (anchor) put(findingsHost, h("p", { class: "toolbar-note" }, "The starting record couldn't be loaded."));
+      return;
+    }
+    if (!a.incident_id) return put(findingsHost, h("p", { class: "toolbar-note" }, "The starting record has no incident, so there are no incident findings to show."));
+    const all = await fetchAllMemories({ status: "active" });
+    const found = (all.items || []).filter((m) => m.incident_id === a.incident_id && m.source_type === "investigation");
+    put(findingsHost, found.length
+      ? h("ul", { class: "findings-list" }, found.map((m) => h("li", { class: "prov prov-confirmed" },
+          h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(m.id) }, m.title),
+          h("span", { class: "prov-label" }, `${typeLabel(m.memory_type)} · recorded ${fmtWhen(m.created_at)}`))))
+      : h("p", { class: "toolbar-note" }, `None on ${a.incident_id} yet. A finding you record appears here.`));
+  })();
+
+  return [header, h("div", { class: "grid grid-main" }, summary, next), ai, detail.el];
 }
 
 /** Turn a confirmed conclusion into a canonical record, linked to its evidence and incident. */

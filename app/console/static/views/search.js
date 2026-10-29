@@ -3,15 +3,17 @@ import { SOURCE_LABEL, busy, empty, lifecycleChip, notice, num, pageHead, scoreB
 import { api } from "../lib/api.js";
 import { h, put, s } from "../lib/dom.js";
 import { capable, href, main, navLink, state } from "../lib/state.js";
+import { isAdmin } from "../lib/session.js";
 
 /* ------------------------------------------------------------ search */
 
 export async function viewSearch(params) {
-  const mode = params.get("mode") || "hybrid";
+  const admin = isAdmin();
+  const mode = admin ? params.get("mode") || "hybrid" : "hybrid";
   const out = h("div", { class: "stack", "aria-live": "polite" });
   const query = h("input", { type: "search", id: "s-q", name: "query", value: params.get("q") || "", placeholder: "Describe a symptom, part or fix", required: true });
   const modes = [["semantic", "Meaning"], ["graph", "Relationships"], ["hybrid", "Both"]];
-  const seg = h("fieldset", null, h("legend", null, "Match by"),
+  const seg = h("fieldset", { hidden: !admin }, h("legend", null, "Match by"),
     h("div", { class: "segmented" }, modes.map(([v, l]) => h("label", null,
       h("input", { type: "radio", name: "mode", value: v, checked: v === mode }), h("span", null, l)))));
   const inactive = h("label", { class: "check" }, h("input", { type: "checkbox", name: "inactive" }), "Include archived and disputed");
@@ -38,14 +40,14 @@ export async function viewSearch(params) {
         r.data.anchor_memory_id ? navLink("Show relationships of the top match", "graph", { anchor: r.data.anchor_memory_id }, "btn") : null),
       res.length
         ? h("div", { class: "table-wrap" }, h("table", null,
-            h("caption", null, `${res.length} result${res.length === 1 ? "" : "s"} in ${num(r.data.latency_ms, 0)} ms${r.data.anchor_memory_id && m !== "semantic" ? `. Graph links are relative to ${anchorRow ? `“${anchorRow.title}”` : "the best vector match"}.` : ""}`),
-            h("thead", null, h("tr", null, ["Record", "Found by", "Similarity", "Status", "Asset"].map((c) => h("th", { scope: "col" }, c)))),
+            h("caption", null, `${res.length} result${res.length === 1 ? "" : "s"}${admin ? ` in ${num(r.data.latency_ms, 0)} ms` : ""}${r.data.anchor_memory_id && m !== "semantic" ? `. Graph links are relative to ${anchorRow ? `“${anchorRow.title}”` : "the best vector match"}.` : ""}`),
+            h("thead", null, h("tr", null, (admin ? ["Record", "Found by", "Similarity", "Status", "Asset"] : ["Record", "Status", "Asset"]).map((c) => h("th", { scope: "col" }, c)))),
             h("tbody", null, res.map((x) => {
               const open = () => showMemory(x.memory_id);
               return h("tr", { class: "is-clickable", tabindex: "0", onclick: open, onkeydown: (e) => { if (e.key === "Enter") open(); } },
                 h("td", null, h("span", { class: "cell-title" }, x.title || shortId(x.memory_id)), h("span", { class: "cell-sub" }, x.content_preview || "Not found in PostgreSQL")),
-                h("td", null, h("span", { class: "tag" }, SOURCE_LABEL[x.retrieval_source] || x.retrieval_source)),
-                h("td", null, typeof x.semantic_score === "number" ? scoreBar(x.semantic_score) : "—"),
+                admin ? h("td", null, h("span", { class: "tag" }, SOURCE_LABEL[x.retrieval_source] || x.retrieval_source)) : null,
+                admin ? h("td", null, typeof x.semantic_score === "number" ? scoreBar(x.semantic_score) : "—") : null,
                 h("td", null, x.status ? lifecycleChip(x.status) : "—"),
                 h("td", null, x.asset_id || "—"));
             }))))
@@ -56,15 +58,19 @@ export async function viewSearch(params) {
       seg, inactive, go2));
 
   const notes = [];
-  if (!capable("qdrant")) notes.push(notice("warn", "Meaning search is offline", "Qdrant is unavailable. Relationship search also needs it to pick a starting record from your words."));
-  if (!capable("neo4j")) notes.push(notice("warn", "Relationship search is offline", "Neo4j is unavailable, so only meaning search can run."));
+  if (!admin && !capable("qdrant", "neo4j")) notes.push(notice("warn", "Search is limited right now", "Some matching records may not appear until the service recovers. Try again shortly, or find by text in Records."));
+  else if (!admin) { /* plant users don't see engine details */ }
+  else if (!capable("qdrant")) notes.push(notice("warn", "Meaning search is offline", "Qdrant is unavailable. Relationship search also needs it to pick a starting record from your words."));
+  if (admin && !capable("neo4j")) notes.push(notice("warn", "Relationship search is offline", "Neo4j is unavailable, so only meaning search can run."));
   const emb = state.health?.embedding_provider;
-  if (capable("qdrant") && emb && !emb.semantic) {
+  if (admin && capable("qdrant") && emb && !emb.semantic) {
     notes.push(emb.name === "HashedTermEmbedding"
       ? notice("info", "Similarity is based on shared words", "The term-hashing embedding ranks records that use the same words as your query. Synonyms won't match until a semantic embedding model is configured.")
       : notice("info", "Similarity scores are test values", "The default test embedding hashes whole texts, so scores don't reflect meaning. Set EMBEDDING_PROVIDER=hashed_terms for word-based ranking, or configure a semantic model."));
   }
 
-  put(main, pageHead("Search", "Find records by meaning, by their links to the best match, or both. These are the same retrieval modes the benchmark measures."), ...notes, form, out);
+  put(main, pageHead("Search", admin
+    ? "Find records by meaning, by their links to the best match, or both. These are the same retrieval modes the benchmark measures."
+    : "Describe a symptom, part or fix to find related records across the plant's history."), ...notes, form, out);
   if (params.get("q")) form.requestSubmit(); else query.focus();
 }

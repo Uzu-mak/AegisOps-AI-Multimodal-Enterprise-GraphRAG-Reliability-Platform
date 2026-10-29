@@ -2,6 +2,7 @@ import { closeDialog } from "../components/dialog.js";
 import { SERVICE_STATE, stateChip } from "../components/ui.js";
 import { API, api } from "./api.js";
 import { h, put } from "./dom.js";
+import { ADMIN_ROUTES, isAdmin } from "./session.js";
 
 export const main = document.getElementById("main");
 
@@ -26,11 +27,22 @@ export function capable(...names) {
   return names.every((n) => svc[n]?.status === "healthy" || svc[n]?.status === "degraded");
 }
 
+/** One plain-language status for plant users: whether every feature works,
+ *  without naming the services behind them. */
+export function plainStatus() {
+  if (state.health?.status === "unreachable") return stateChip("AegisOps is unreachable", "crit");
+  const svc = services();
+  const limited = ["postgres", "qdrant", "neo4j", "llm"].some((k) => svc[k]?.status !== "healthy") || svc.llm?.synthetic;
+  return limited ? stateChip("Some features limited", "warn") : stateChip("All features available", "normal");
+}
+
 export function renderServiceStrip() {
   const strip = document.getElementById("service-strip");
   put(strip);
   if (state.health?.status === "unreachable") {
     strip.append(h("li", null, h("a", { class: "strip-link", href: "#/system" }, stateChip("API unreachable", "crit"))));
+  } else if (!isAdmin()) {
+    strip.append(h("li", { class: "plain-status" }, plainStatus()));
   } else {
     const svc = services();
     const names = [["postgres", "PostgreSQL"], ["qdrant", "Qdrant"], ["neo4j", "Neo4j"], ["llm", "Answer model"]];
@@ -70,8 +82,10 @@ export function contextOf(m) {
   return { asset_id: m.asset_id, facility_id: m.facility_id, component_id: m.component_id, incident_id: m.incident_id };
 }
 
-/** A link that also closes any open dialog. */
+/** A link that also closes any open dialog. Administration pages are not
+ *  linked from the plant-user view. */
 export function navLink(label, route, params, cls = "") {
+  if (ADMIN_ROUTES.has(route) && !isAdmin()) return null;
   return h("a", { href: href(route, params), class: cls || null, onclick: closeDialog }, label);
 }
 

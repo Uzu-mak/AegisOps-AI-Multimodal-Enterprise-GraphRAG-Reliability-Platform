@@ -8,11 +8,13 @@
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 4 7v8c0 7.5 5.1 13.4 12 15 6.9-1.6 12-7.5 12-15V7z' fill='%231C4F91'/%3E%3Cpath d='M10 16h4l2-5 2 10 2-5h2' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preload" href="fonts/atkinson-hyperlegible-next-var.woff" as="font" type="font/woff" crossorigin>
-  <link rel="stylesheet" href="console.css">
+  <link rel="stylesheet" href="console.css?v=9df9157003">
   <script>
     try {
       var t = localStorage.getItem("aegis-theme");
       if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      if (localStorage.getItem("aegis-density") === "compact") document.documentElement.dataset.density = "compact";
+      document.documentElement.dataset.view = localStorage.getItem("aegis-view") === "plant" ? "plant" : "admin";
     } catch (e) {}
   </script>
 </head>
@@ -47,8 +49,8 @@
           <li><a href="#/search" data-route="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>Search</a></li>
           <li><a href="#/graph" data-route="graph"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="m8.2 7 7.4.6M7 8.3l2.2 7.4M16.4 10 11.8 16"/></svg>Relationships</a></li>
         </ul>
-        <p class="nav-group">Assure</p>
-        <ul>
+        <p class="nav-group admin-only">Administration</p>
+        <ul class="admin-only">
           <li><a href="#/evaluation" data-route="evaluation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Evaluation</a></li>
           <li><a href="#/system" data-route="system"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/><path d="M7 7h.01M7 17h.01"/></svg>System health</a></li>
         </ul>
@@ -59,6 +61,15 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
           <span>Dark display</span>
         </button>
+        <button id="density-toggle" class="theme-toggle" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+          <span>Compact layout</span>
+        </button>
+        <button id="view-toggle" class="theme-toggle" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 4-5.5 7-5.5s5.8 1.9 7 5.5"/></svg>
+          <span>View as plant user</span>
+        </button>
+        <p id="view-meta" class="rail-meta" aria-live="polite"></p>
         <p class="rail-meta">Press <kbd>?</kbd> for keyboard shortcuts</p>
       </div>
     </header>
@@ -78,6 +89,32 @@
     <div class="dialog-inner"></div>
   </dialog>
 
-  <script type="module" src="console.js"></script>
+  <!-- assets:start (scripts/stamp_console.py) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "./components/dialog.js": "./components/dialog.js?v=48d0f50049",
+      "./components/records.js": "./components/records.js?v=1720fb2e56",
+      "./components/tabs.js": "./components/tabs.js?v=54088531e3",
+      "./components/ui.js": "./components/ui.js?v=ae808e87ce",
+      "./console.js": "./console.js?v=26ce0448b3",
+      "./lib/api.js": "./lib/api.js?v=dfecbd8e13",
+      "./lib/dom.js": "./lib/dom.js?v=61f4294a38",
+      "./lib/session.js": "./lib/session.js?v=07051182d7",
+      "./lib/state.js": "./lib/state.js?v=583fb636fb",
+      "./views/evaluation.js": "./views/evaluation.js?v=54c86655f7",
+      "./views/graph.js": "./views/graph.js?v=61a01b2dcf",
+      "./views/import.js": "./views/import.js?v=6c5fe39d66",
+      "./views/incidents.js": "./views/incidents.js?v=eb33e691b6",
+      "./views/investigate.js": "./views/investigate.js?v=8438322cc6",
+      "./views/overview.js": "./views/overview.js?v=35b0749ce1",
+      "./views/records.js": "./views/records.js?v=1c3c519164",
+      "./views/search.js": "./views/search.js?v=67cb234820",
+      "./views/system.js": "./views/system.js?v=ba4a21a7d7"
+    }
+  }
+  </script>
+  <script type="module" src="./console.js?v=26ce0448b3"></script>
+  <!-- assets:end -->
 </body>
 </html>
