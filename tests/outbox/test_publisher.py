@@ -94,76 +94,39 @@ def make_rows() -> list[ProjectionOutboxEvent]:
     return rows
 
 
-def test_pending_outbox_event_is_published_and_marked_after_ack():
-    rows = make_rows()
-    session = FakeSession(rows)
-    producer = RecordingProducer()
-    publisher = ProjectionEventPublisher(
-        session_factory=lambda: session,
-        producer=producer,
-        topic="aegisops.memory.projections.v1",
-    )
-
-    stats = publisher.publish_batch()
-
-    assert stats["published"] == 1
-    assert len(producer.messages) == 1
-    assert producer.messages[0]["key"].decode("utf-8") == str(rows[0].memory_id)
-
-    payload = json.loads(producer.messages[0]["value"].decode("utf-8"))
-    assert payload["memory_id"] == str(rows[0].memory_id)
-    assert payload["schema_version"] == 1
-
-    assert session.committed is True
-    assert all(row.kafka_published_at is not None for row in rows)
-    assert all(row.kafka_publish_status == KafkaPublishStatus.PUBLISHED.value for row in rows)
+def test_pending_outbox_event_is_published_and_marked_after_ack(isolated_sessions):
+    from tests.reliability.test_architecture_fixes import service, data
+    from sqlalchemy import select
+    sf=isolated_sessions;service(sf).create_memory(data=data())
+    producer=RecordingProducer()
+    publisher=ProjectionEventPublisher(session_factory=sf,producer=producer,topic="test")
+    assert publisher.publish_batch()["published"]==1
+    assert len(producer.messages)==1
+    with sf() as session:
+        assert all(row.kafka_published_at for row in session.scalars(select(ProjectionOutboxEvent)))
 
 
-def test_kafka_publication_failure_leaves_event_pending():
-    rows = make_rows()
-    session = FakeSession(rows)
-    producer = RecordingProducer(fail_times=1)
-    publisher = ProjectionEventPublisher(
-        session_factory=lambda: session,
-        producer=producer,
-        topic="aegisops.memory.projections.v1",
-    )
-
-    stats = publisher.publish_batch()
-
-    assert stats["failed"] == 1
-    assert producer.messages == []
-
-    assert session.committed is True
-    assert all(row.kafka_published_at is None for row in rows)
-    assert all(row.kafka_retry_count == 1 for row in rows)
-    assert all(row.kafka_error_message == "Kafka unavailable" for row in rows)
+def test_kafka_publication_failure_leaves_event_pending(isolated_sessions):
+    from tests.reliability.test_architecture_fixes import service, data
+    from sqlalchemy import select
+    sf=isolated_sessions;service(sf).create_memory(data=data())
+    publisher=ProjectionEventPublisher(session_factory=sf,producer=RecordingProducer(fail_times=1),topic="test")
+    assert publisher.publish_batch()["failed"]==1
+    with sf() as session:
+        assert all(row.kafka_published_at is None and row.kafka_retry_count==1 for row in session.scalars(select(ProjectionOutboxEvent)))
 
 
-def test_failed_event_can_be_retried_with_stable_event_id():
-    rows = make_rows()
-    original_event_id = rows[0].event_id
-
-    failing_producer = RecordingProducer(fail_times=1)
-    publisher = ProjectionEventPublisher(
-        session_factory=lambda: FakeSession(rows),
-        producer=failing_producer,
-        topic="aegisops.memory.projections.v1",
-    )
+def test_failed_event_can_be_retried_with_stable_event_id(isolated_sessions):
+    from tests.reliability.test_architecture_fixes import service, data
+    from sqlalchemy import select
+    sf=isolated_sessions;service(sf).create_memory(data=data())
+    producer=RecordingProducer(fail_times=1)
+    publisher=ProjectionEventPublisher(session_factory=sf,producer=producer,topic="test")
     publisher.publish_batch()
-
-    succeeding_producer = RecordingProducer()
-    retry_publisher = ProjectionEventPublisher(
-        session_factory=lambda: FakeSession(rows),
-        producer=succeeding_producer,
-        topic="aegisops.memory.projections.v1",
-    )
-    stats = retry_publisher.publish_batch()
-
-    assert stats["published"] == 1
-    payload = json.loads(succeeding_producer.messages[0]["value"].decode("utf-8"))
-    assert payload["event_id"] == str(original_event_id)
-
-    assert len({row.event_id for row in rows}) == 1
-    assert rows[0].event_id == original_event_id
-    assert all(row.kafka_published_at is not None for row in rows)
+    with sf() as session:
+        rows=session.scalars(select(ProjectionOutboxEvent)).all()
+        expected=rows[0].event_id
+        for row in rows: row.kafka_next_attempt_at=None
+        session.commit()
+    assert publisher.publish_batch()["published"]==1
+    assert json.loads(producer.messages[0]["value"])["event_id"]==str(expected)

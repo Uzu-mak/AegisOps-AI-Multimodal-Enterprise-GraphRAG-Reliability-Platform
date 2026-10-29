@@ -108,6 +108,8 @@ class ImportOptions:
     is_synthetic: bool = False
     day_first: bool = False
     timezone: str = "UTC"
+    source_system: str = "default"
+    tenant_id: Optional[str] = None
     default_facility_id: Optional[str] = None
     column_map: dict[str, str] = field(default_factory=dict)
     file_name: Optional[str] = None
@@ -264,6 +266,9 @@ def fingerprint(data: MemoryCreateData) -> str:
         "component_id": data.component_id, "facility_id": data.facility_id,
         "incident_id": data.incident_id, "observed_at": data.observed_at.isoformat() if data.observed_at else None,
         "fields": data.memory_metadata.get("work_order"),
+        "extra": data.memory_metadata.get("extra", {}),
+        "is_synthetic": data.is_synthetic,
+        "tenant_id": data.tenant_id,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:32]
 
@@ -383,6 +388,7 @@ def parse_work_orders(csv_text: str, options: Optional[ImportOptions] = None) ->
             title=title if len(title) <= 160 else title[:157] + "...",
             content="\n".join(lines),
             source_type=SOURCE_TYPE,
+            tenant_id=options.tenant_id,
             source_id=wo,
             asset_id=asset,
             component_id=location,
@@ -395,7 +401,7 @@ def parse_work_orders(csv_text: str, options: Optional[ImportOptions] = None) ->
             memory_metadata={"work_order": wo_fields, **({"extra": extra} if extra else {})},
         )
         fp = fingerprint(data)
-        data.memory_metadata["import"] = {"fingerprint": fp, "file_name": options.file_name, "row": idx}
+        data.memory_metadata["import"] = {"fingerprint": fp, "source_system": options.source_system, "file_name": options.file_name, "row": idx}
         out.append(ParsedWorkOrder(row=idx, wo_number=wo, data=data, fingerprint=fp))
 
     if rows_read == 0:
@@ -451,7 +457,8 @@ def run_import(service: Any, csv_text: str, options: Optional[ImportOptions] = N
             "Could not find a column for: " + ", ".join(FIELD_LABELS[f] for f in parsed.missing_required)
             + f". Columns in the file: {', '.join(parsed.columns)}. Map them and preview again.")
     found = service.active_source_fingerprints(
-        source_type=SOURCE_TYPE, source_ids=sorted({w.wo_number for w in parsed.work_orders}))
+        source_type=SOURCE_TYPE, source_ids=sorted({w.wo_number for w in parsed.work_orders}),
+        source_system=options.source_system, tenant_id=options.tenant_id)
     existing = {k: ExistingRecord(memory_id=mid, fingerprint=fp) for k, (mid, fp) in found.items()}
     plan = plan_import(parsed.work_orders, existing)
 
@@ -508,6 +515,8 @@ def _main(argv: Optional[list[str]] = None) -> int:
 
     ap = argparse.ArgumentParser(description="Import a CMMS work-order CSV export into AegisOps.")
     ap.add_argument("csv_file", type=Path)
+    ap.add_argument("--source-system", default="default", help="Stable CMMS instance identity")
+    ap.add_argument("--tenant-id", default=None)
     ap.add_argument("--apply", action="store_true", help="Write the records (default is a dry run that only reports).")
     ap.add_argument("--synthetic", action="store_true", help="Flag every imported record as synthetic / sample data.")
     ap.add_argument("--day-first", action="store_true", help="Read ambiguous dates as DD/MM/YYYY instead of MM/DD/YYYY.")
@@ -523,7 +532,7 @@ def _main(argv: Optional[list[str]] = None) -> int:
             ap.error(f"--map expects FIELD=COLUMN, got '{item}'")
         k, v = item.split("=", 1)
         column_map[k.strip()] = v.strip()
-    options = ImportOptions(is_synthetic=args.synthetic, day_first=args.day_first, timezone=args.timezone,
+    options = ImportOptions(source_system=args.source_system, tenant_id=args.tenant_id, is_synthetic=args.synthetic, day_first=args.day_first, timezone=args.timezone,
                             default_facility_id=args.facility, column_map=column_map, file_name=args.csv_file.name)
     service = RealMemoryService(repository=SQLAlchemyMemoryRepository(), session_factory=SessionLocal)
     try:

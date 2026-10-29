@@ -216,5 +216,5 @@ class TestStaleProjections:
         mock_semantic_index.search_similar.return_value = [MagicMock(memory_id=mid, score=0.9)]
         broken = MagicMock(side_effect=RuntimeError("db down"))
         retriever = HybridMemoryRetriever(mock_semantic_index, None, mock_embedding_provider, broken)
-        results = retriever.retrieve(RetrievalQuery(text="q", mode="semantic"))
-        assert [r.memory_id for r in results] == [mid] and results[0].canonical_record is None
+        with pytest.raises(RuntimeError, match="Canonical database unavailable"):
+            retriever.retrieve(RetrievalQuery(text="q", mode="semantic"))

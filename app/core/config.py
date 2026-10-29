@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+_CONTAINER = Path("/.dockerenv").exists()
 from functools import lru_cache
 from typing import Final
 
@@ -19,12 +21,14 @@ class Settings:
             "DATABASE_URL environment variable is required. Set it in your shell or .env before starting AegisOps."
         )
 
+    EMBEDDING_MODEL: Final[str] = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    EMBEDDING_DIMENSION: Final[int] = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
     # Qdrant configuration
-    QDRANT_URL: Final[str | None] = os.getenv("QDRANT_URL", "http://qdrant:6333")
-    QDRANT_COLLECTION_NAME: Final[str] = os.getenv("QDRANT_COLLECTION_NAME", "memories")
+    QDRANT_URL: Final[str | None] = os.getenv("QDRANT_URL", "http://qdrant:6333" if _CONTAINER else "http://127.0.0.1:6333")
+    QDRANT_COLLECTION_NAME: Final[str] = os.getenv("QDRANT_COLLECTION_NAME", "memories" if os.getenv("EMBEDDING_PROVIDER", "fake") == "fake" else "memories_" + os.getenv("EMBEDDING_PROVIDER", "fake") + "_" + os.getenv("EMBEDDING_MODEL", "text-embedding-3-small").replace("-", "_") + "_" + os.getenv("EMBEDDING_DIMENSION", "1536"))
 
     # Neo4j configuration
-    NEO4J_URI: Final[str] = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
+    NEO4J_URI: Final[str] = os.getenv("NEO4J_URI", "bolt://neo4j:7687" if _CONTAINER else "bolt://127.0.0.1:7687")
     NEO4J_USERNAME: Final[str] = os.getenv("NEO4J_USERNAME", "neo4j")
     NEO4J_PASSWORD: Final[str] = os.getenv("NEO4J_PASSWORD", "aegisops")
     NEO4J_DATABASE: Final[str] = os.getenv("NEO4J_DATABASE", "neo4j")

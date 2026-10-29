@@ -14,7 +14,7 @@ from enum import Enum
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -49,6 +49,14 @@ class ProjectionOutboxEvent(Base):
     __tablename__ = "projection_outbox"
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    # Envelope fields are append-only; delivery fields below may change.
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    lease_token: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    kafka_next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    kafka_lease_token: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    kafka_lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     memory_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False, index=True)
     projection_type: Mapped[str] = mapped_column(String(20), nullable=False)
     operation: Mapped[str] = mapped_column(String(30), nullable=False, default="project")

@@ -49,17 +49,17 @@ def groundedness_score(answer: str) -> float:
     """
     sentences = [s.strip() for s in re.split(r"[.!?]+", answer or "") if len(s.strip()) > 30]
     if not sentences:
-        return 1.0
+        return 0.0
     return sum(1 for s in sentences if _CITATION.search(s)) / len(sentences)
 
 
 def citation_accuracy(answer: str, evidence_count: int) -> float:
     """Fraction of [Memory N] citations that point at an evidence item that exists."""
     if evidence_count == 0:
-        return 1.0
+        return 0.0
     refs = _CITATION.findall(answer or "")
     if not refs:
-        return 1.0
+        return 0.0
     return sum(1 for r in refs if 1 <= int(r) <= evidence_count) / len(refs)
 
 

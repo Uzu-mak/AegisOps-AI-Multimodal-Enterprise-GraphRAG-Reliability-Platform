@@ -63,7 +63,7 @@ class HybridMemoryRetriever:
         Returns RetrievalResult list with canonical_record hydrated from
         PostgreSQL.
         """
-        t0 = time.monotonic()
+        t0 = time.perf_counter()
         semantic_hits: dict[UUID, float] = {}
         graph_hits: set[UUID] = set()
 
@@ -144,6 +144,8 @@ class HybridMemoryRetriever:
         if results:
             records = self._hydrate_from_postgres([r.memory_id for r in results])
             hydration_failed = records is None
+            if hydration_failed:
+                raise RuntimeError("Canonical database unavailable; retrieval cannot return authoritative evidence")
             records = records or {}
             kept: list[RetrievalResult] = []
             for result in results:
@@ -168,9 +170,16 @@ class HybridMemoryRetriever:
         if not results and query.keyword_fallback and query.mode != "graph":
             results = self._keyword_fallback(query)
 
+        if query.mode == "hybrid":
+            linked = [r for r in results if r.retrieval_source == "graph"]
+            vector = [r for r in results if r.retrieval_source != "graph"]
+            quota = min(len(linked), max(1, query.final_limit // 4)) if query.final_limit > 1 else 0
+            chosen = vector[:query.final_limit - quota] + linked[:quota]
+            selected = {r.memory_id for r in chosen}
+            results = chosen + [r for r in results if r.memory_id not in selected]
         results = results[: query.final_limit]
 
-        elapsed_ms = (time.monotonic() - t0) * 1000
+        elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(
             f"HybridRetrieval mode={query.mode} returned {len(results)} results "
             f"in {elapsed_ms:.1f}ms"

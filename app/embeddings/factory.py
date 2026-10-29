@@ -20,12 +20,16 @@ def create_embedding_provider(name: str | None = None) -> EmbeddingProvider:
     from app.core.config import get_settings
 
     choice = (name or getattr(get_settings(), "EMBEDDING_PROVIDER", "fake") or "fake").strip().lower()
+    if choice == "openai":
+        from app.embeddings.openai_embedding import OpenAIEmbedding
+        settings = get_settings()
+        return OpenAIEmbedding(settings.EMBEDDING_MODEL, settings.EMBEDDING_DIMENSION)
     if choice in {"hashed_terms", "hashed-terms", "terms"}:
         from app.embeddings.hashed_terms import HashedTermEmbedding
 
         return HashedTermEmbedding()
     if choice not in {"fake", "test", "deterministic"}:
-        logger.warning("Unknown EMBEDDING_PROVIDER=%r; using deterministic fake embedding", choice)
+        raise ValueError(f"Unsupported EMBEDDING_PROVIDER: {choice}")
     from app.embeddings.fake import DeterministicFakeEmbedding
 
     return DeterministicFakeEmbedding()

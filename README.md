@@ -1,3 +1,6 @@
+> Current local Docker/IDE launch, authentication, event delivery and recovery guidance:
+> [Local development and operations](docs/LOCAL_DEVELOPMENT.md).
+
 # AegisOps
 
 **Operational memory for infrastructure and industrial asset operations.** AegisOps captures observations, incidents, diagnoses, actions, and resolutions, then makes them available through semantic, graph, and hybrid retrieval.
@@ -25,7 +28,7 @@
 
 PostgreSQL owns canonical memory content. Qdrant and Neo4j are derived retrieval projections. Every write commits the record and its outbox events in one transaction; the API then makes a best-effort synchronous projection, and the **projection worker** drains the outbox so that any projection missed while a store was down is applied once it returns. A successful database commit is never rolled back when an index operation fails.
 
-Kafka is optional. With the `integration` compose profile and `KAFKA_ENABLED=true`, the outbox publisher also emits every committed event to a Kafka topic for external systems such as a CMMS or MES. Nothing inside AegisOps consumes that topic, and nothing depends on it.
+Kafka is optional. With the `integration` compose profile and `KAFKA_ENABLED=true`, the outbox publisher also emits every new committed event (schema v2 includes a historical content snapshot) to a Kafka topic for external systems such as a CMMS or MES. Nothing inside AegisOps consumes that topic, and nothing depends on it.
 
 ```mermaid
 flowchart LR
@@ -406,7 +409,7 @@ Compose supplies service hostnames such as `postgres`, `qdrant`, and `neo4j` to 
 | `LLM_PROVIDER` | `test` in Compose | GraphRAG provider selection |
 | `LLM_MODEL` | configured model name | Model identifier for the configured provider |
 | `OPENAI_API_KEY` | unset | Provider credential when required |
-| `EMBEDDING_PROVIDER` | `fake` | `fake` (SHA-256 test vectors) or `hashed_terms` (lexical term hashing); re-project records after switching |
+| `EMBEDDING_PROVIDER` | `fake` | `fake` (test vectors), `hashed_terms` (lexical), or `openai` (semantic); use a separate collection and re-project after switching |
 | `PROJECTION_CONNECT_TIMEOUT_SECONDS` | `2` | Connect timeout for Qdrant, Neo4j and the Kafka health probe |
 | `PROJECTION_RETRY_SECONDS` | `15` | After a failed connect, requests skip that store for this long instead of waiting on it again |
 | `OUTBOX_WORKER_POLL_SECONDS` | `2.0` | Idle poll interval for the projection worker |

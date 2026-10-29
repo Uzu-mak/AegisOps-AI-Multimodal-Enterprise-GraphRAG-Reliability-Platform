@@ -19,16 +19,17 @@ def _session_with(events):
     return MagicMock(return_value=session)
 
 
-def test_unavailable_store_defers_without_consuming_retries():
-    event = make_event(status=ProjectionStatus.PENDING.value)
-    worker = OutboxWorker(
-        session_factory=_session_with([event]),
-        qdrant_fn=MagicMock(side_effect=ProjectionStoreUnavailable("Qdrant unavailable")),
-    )
-    stats = worker.process_batch()
-    assert stats["deferred"] == 1
-    assert event.retry_count == 0
-    assert event.status == ProjectionStatus.PENDING.value
+def test_unavailable_store_defers_without_consuming_retries(isolated_sessions):
+    from tests.reliability.test_architecture_fixes import service, data
+    from sqlalchemy import select
+    from app.outbox.models import ProjectionOutboxEvent
+    sf=isolated_sessions
+    service(sf).create_memory(data=data())
+    worker=OutboxWorker(sf, qdrant_fn=MagicMock(side_effect=ProjectionStoreUnavailable("offline")), neo4j_fn=lambda *_:None)
+    assert worker.process_batch()["deferred"] == 1
+    with sf() as session:
+        event=session.scalar(select(ProjectionOutboxEvent).where(ProjectionOutboxEvent.projection_type=="qdrant"))
+        assert event.retry_count == 0 and event.status == "pending"
 
 
 def test_projection_fns_raise_deferral_when_store_missing():

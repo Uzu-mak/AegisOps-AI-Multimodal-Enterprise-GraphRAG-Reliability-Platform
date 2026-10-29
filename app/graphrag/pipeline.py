@@ -68,7 +68,7 @@ class GraphRAGPipeline:
 
     def retrieve(self, question: str, anchor_memory_id: Optional[str] = None) -> tuple[list[RetrievalResult], float]:
         """Retrieve evidence once (hybrid, with PostgreSQL keyword fallback). Returns (results, ms)."""
-        t0 = time.monotonic()
+        t0 = time.perf_counter()
         try:
             from uuid import UUID
 
@@ -87,7 +87,7 @@ class GraphRAGPipeline:
             results = []
         if anchor_memory_id:
             results = self._scope_to_anchor(results, anchor_memory_id)
-        return results, (time.monotonic() - t0) * 1000
+        return results, (time.perf_counter() - t0) * 1000
 
     def _scope_to_anchor(self, results: list[RetrievalResult], anchor_memory_id: str) -> list[RetrievalResult]:
         """
@@ -128,10 +128,10 @@ class GraphRAGPipeline:
 
     def answer(self, question: str, results: list[RetrievalResult], retrieval_ms: float = 0.0) -> GraphRAGResponse:
         """Generate an evidence-grounded answer from already-retrieved results."""
-        t_start = time.monotonic()
+        t_start = time.perf_counter()
         ctx: BuiltContext = build_context(question=question, results=results, max_evidence=self.context_limit)
 
-        t_gen = time.monotonic()
+        t_gen = time.perf_counter()
         try:
             messages = [
                 LLMMessage(role="system", content=ctx.system_prompt),
@@ -149,7 +149,7 @@ class GraphRAGPipeline:
             logger.error(f"GraphRAG LLM generation failed: {exc}")
             answer, model_name, prompt_tokens, completion_tokens, is_synthetic = (
                 "[LLM generation failed due to an unexpected error.]", "error", 0, 0, True)
-        generation_ms = (time.monotonic() - t_gen) * 1000
+        generation_ms = (time.perf_counter() - t_gen) * 1000
 
         effective_mode = self.retrieval_mode
         if results and all(r.retrieval_source == "keyword" for r in results):
@@ -167,7 +167,7 @@ class GraphRAGPipeline:
             completion_tokens=completion_tokens,
             retrieval_latency_ms=retrieval_ms,
             generation_latency_ms=generation_ms,
-            total_latency_ms=retrieval_ms + (time.monotonic() - t_start) * 1000,
+            total_latency_ms=retrieval_ms + (time.perf_counter() - t_start) * 1000,
             is_synthetic_response=is_synthetic,
         )
 

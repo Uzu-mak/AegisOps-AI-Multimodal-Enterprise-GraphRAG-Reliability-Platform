@@ -80,7 +80,7 @@ class EvaluationRunner:
         mode: RetrievalMode,
         k: int,
     ) -> EvalCaseResult:
-        t_total = time.monotonic()
+        t_total = time.perf_counter()
         result = EvalCaseResult(
             case_id=case.case_id,
             question=case.question,
@@ -120,7 +120,7 @@ class EvaluationRunner:
             result.error = str(exc)
             result.failure_category = FailureCategory.PROVIDER_FAILURE
 
-        result.total_latency_ms = (time.monotonic() - t_total) * 1000
+        result.total_latency_ms = (time.perf_counter() - t_total) * 1000
         return result
 
     def _aggregate(self, run: EvalRun) -> None:
@@ -132,8 +132,9 @@ class EvaluationRunner:
         run.failed_cases = sum(1 for r in results if not r.success)
         run.task_success_rate = 1.0 - (run.failed_cases / run.total_cases)
 
-        run.mean_recall_at_k = sum(r.recall_at_k for r in results) / len(results)
-        run.mean_mrr = sum(r.mrr for r in results) / len(results)
+        labeled = [r for r in results if r.labeled and r.error is None]
+        run.mean_recall_at_k = sum(r.recall_at_k for r in labeled) / len(labeled) if labeled else 0.0
+        run.mean_mrr = sum(r.mrr for r in labeled) / len(labeled) if labeled else 0.0
         answered = [r for r in results if r.groundedness is not None]
         run.mean_groundedness = sum(r.groundedness for r in answered) / len(answered) if answered else 0.0
         cited = [r for r in results if r.citation_accuracy is not None]

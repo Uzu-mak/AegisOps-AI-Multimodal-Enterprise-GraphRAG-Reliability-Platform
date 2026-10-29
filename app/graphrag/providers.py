@@ -74,7 +74,9 @@ class DeterministicTestProvider(LLMProvider):
             lines.append("")
             for n, block in enumerate(blocks, start=1):
                 kind = block.get("type", "record").replace("_", " ")
-                lines.append(f"- {kind.capitalize()}: {block.get('title', '')}. {block.get('content', '')} [Memory {n}]")
+                excerpt = f"{kind.capitalize()}: {block.get('title', '')}. {block.get('content', '')}"
+                sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", excerpt) if part.strip()]
+                lines.append("- " + " ".join(f"{part.rstrip('.!?')} [Memory {n}]." for part in sentences))
             lines += ["", "These records are listed in retrieval order without interpretation."]
         else:
             lines += ["", "No operational records matched, so there is no evidence to summarise."]

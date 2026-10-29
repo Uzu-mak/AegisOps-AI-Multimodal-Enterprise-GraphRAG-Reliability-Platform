@@ -59,7 +59,7 @@ class RuleBasedCritic:
             # Skip meta-commentary about evidence availability
             if "insufficient" in sent.lower() or "not provided" in sent.lower():
                 continue
-            if "synthetic" in sent.lower() or "deterministic" in sent.lower():
+            if "synthetic" in sent.lower() or "deterministic" in sent.lower() or "configure openai_api_key" in sent.lower() or "retrieval order without interpretation" in sent.lower() or "retrieved memory records" in sent.lower():
                 continue
             # If sentence has no [Memory N] citation, flag it
             if not re.search(r"\[Memory\s+\d+\]", sent):
@@ -69,13 +69,14 @@ class RuleBasedCritic:
         citations_valid = len(invalid_citations) == 0
         # Consider supported if at least some citations exist OR answer acknowledges evidence
         has_any_citation = bool(cited_refs)
-        is_supported = citations_valid and (has_any_citation or len(evidence) == 0)
+        is_supported = citations_valid and has_any_citation and not unsupported
 
         confidence = 1.0
         if invalid_citations:
             confidence -= 0.3 * len(invalid_citations)
         if not has_any_citation and evidence:
             confidence -= 0.2
+        confidence -= min(0.5, len(unsupported) * 0.1)
         confidence = max(0.0, min(1.0, confidence))
 
         return CriticResult(

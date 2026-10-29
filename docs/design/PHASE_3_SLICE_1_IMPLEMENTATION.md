@@ -1,3 +1,5 @@
+> Historical design record. Current implementation and launch guidance: [Local development](../LOCAL_DEVELOPMENT.md). Proposed RabbitMQ and broker-driven projections are not the current architecture.
+
 # PHASE 3 — Slice 1 Implementation
 
 Date: 2026-09-01

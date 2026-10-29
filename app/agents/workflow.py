@@ -41,7 +41,7 @@ class AegisOpsWorkflow:
         self.working_memory_size = working_memory_size
 
     def run(self, task: str, anchor_memory_id: Optional[str] = None) -> tuple[AgentTrace, GraphRAGResponse]:
-        t_start = time.monotonic()
+        t_start = time.perf_counter()
         trace = AgentTrace(task=task, status="running")
         wm = WorkingMemory(max_items=self.working_memory_size)
 
@@ -97,28 +97,28 @@ class AegisOpsWorkflow:
         ))
 
         # 3. Synthesis from exactly those results
-        t0 = time.monotonic()
+        t0 = time.perf_counter()
         rag = self.graphrag.answer(task, results, retrieval_ms)
         trace.add_step(AgentStep(
             step_type=AgentStepType.SYNTHESIS,
             description=f"Answer written from {len(rag.evidence)} evidence record{'s' if len(rag.evidence) != 1 else ''} by {rag.model_name}",
             output_summary=rag.answer[:200],
-            latency_ms=(time.monotonic() - t0) * 1000,
+            latency_ms=(time.perf_counter() - t0) * 1000,
         ))
 
         # 4. Critic
-        t0 = time.monotonic()
+        t0 = time.perf_counter()
         critic = self.critic.verify(answer=rag.answer, evidence=rag.evidence)
         trace.critic_result = critic
         trace.add_step(AgentStep(
             step_type=AgentStepType.CRITIC,
             description="Citations check out" if critic.is_supported else "Answer is not fully supported by cited evidence",
             output_summary=critic.notes,
-            latency_ms=(time.monotonic() - t0) * 1000,
+            latency_ms=(time.perf_counter() - t0) * 1000,
         ))
 
         trace.final_answer = rag.answer
         trace.evidence_memory_ids = [r.memory_id for r in hydrated[: len(rag.evidence)]]
-        trace.total_latency_ms = (time.monotonic() - t_start) * 1000
+        trace.total_latency_ms = (time.perf_counter() - t_start) * 1000
         trace.status = "complete"
         return trace, rag

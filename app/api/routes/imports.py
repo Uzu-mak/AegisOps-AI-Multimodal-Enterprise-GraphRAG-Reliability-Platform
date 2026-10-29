@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import get_memory_service
+from app.core.security import current_principal
 from app.ingestion.work_orders import MAX_BYTES, ImportOptions, WorkOrderImportError, run_import
 from app.services.exceptions import InvalidMemoryDataError, MemoryConflictError
 
@@ -29,6 +30,7 @@ class WorkOrderImportRequest(BaseModel):
     is_synthetic: bool = Field(default=False, description="Mark every record as sample / synthetic data.")
     day_first: bool = Field(default=False, description="Read 03/04/2026 as 3 April instead of March 4.")
     timezone: str = Field(default="UTC", description="IANA time zone for dates without an offset.")
+    source_system: str = Field(default="default", min_length=1, max_length=128)
     default_facility_id: Optional[str] = None
     column_map: dict[str, str] = Field(default_factory=dict, description="Canonical field -> CSV column overrides.")
 
@@ -36,6 +38,8 @@ class WorkOrderImportRequest(BaseModel):
 @router.post("/work-orders")
 def import_work_orders(request: WorkOrderImportRequest, service=Depends(get_memory_service)) -> dict:
     options = ImportOptions(
+        source_system=request.source_system,
+        tenant_id=current_principal().tenant_id if current_principal() else None,
         is_synthetic=request.is_synthetic,
         day_first=request.day_first,
         timezone=request.timezone,

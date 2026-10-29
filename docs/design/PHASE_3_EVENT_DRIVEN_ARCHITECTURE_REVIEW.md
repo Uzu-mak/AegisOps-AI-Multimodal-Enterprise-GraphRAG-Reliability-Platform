@@ -1,3 +1,5 @@
+> Historical design record. Current implementation and launch guidance: [Local development](../LOCAL_DEVELOPMENT.md). Proposed RabbitMQ and broker-driven projections are not the current architecture.
+
 # PHASE 3: Event-Driven Architecture Review (Inspection Only)
 
 Date: 2026-09-01

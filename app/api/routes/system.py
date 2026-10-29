@@ -40,8 +40,10 @@ def _collect_service_health() -> dict[str, dict[str, Any]]:
     from app.core.connections import get_connections
 
     conns = get_connections()
-    health["qdrant"] = conns.probe("qdrant")
-    health["neo4j"] = conns.probe("neo4j")
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        probes = {name: pool.submit(conns.probe, name) for name in ("qdrant", "neo4j")}
+        health.update({name: future.result() for name, future in probes.items()})
 
     llm_health = llm_health_from_settings(settings)
     health["llm"] = {
@@ -98,7 +100,7 @@ def system_health() -> dict:
         "embedding_provider": {
             "name": type(embedder).__name__,
             "dimension": embedder.get_dimension(),
-            "semantic": False,  # neither bundled provider is a semantic model
+            "semantic": type(embedder).__name__ == "OpenAIEmbedding",
         },
     }
 
@@ -439,7 +441,7 @@ def projection_metrics() -> dict[str, Any]:
             count_res = client.count(collection_name=settings.QDRANT_COLLECTION_NAME, exact=True)
             qdrant_projected = metric_value(status=MetricStatus.AVAILABLE, value=int(count_res.count), unit="records")
         except Exception as exc:
-            qdrant_projected = metric_value(status=MetricStatus.NOT_CONNECTED, value=None, detail=str(exc))
+            qdrant_projected = metric_value(status=MetricStatus.DEGRADED, value=None, detail="Connected to Qdrant, but collection metrics are unavailable: " + type(exc).__name__)
 
     neo4j_nodes = _not_connected("Neo4j not connected")
     neo4j_relationships = _not_connected("Neo4j not connected")

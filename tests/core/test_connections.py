@@ -123,3 +123,18 @@ def test_close_all_closes_resources():
     conns.neo4j_driver()
     conns.close_all()
     assert q.closed and n.closed
+
+
+def test_qdrant_factory_uses_supported_client_constructor(monkeypatch):
+    from app.core.connections import _default_qdrant_factory
+    from unittest.mock import MagicMock
+    import qdrant_client
+    actual=qdrant_client.QdrantClient
+    client=MagicMock()
+    def constructor(*args, **kwargs):
+        import inspect
+        supported=inspect.signature(actual.__init__).parameters
+        assert "check_compatibility" not in kwargs or "check_compatibility" in supported
+        return client
+    monkeypatch.setattr(qdrant_client,"QdrantClient",constructor)
+    assert _default_qdrant_factory(_settings()) is client

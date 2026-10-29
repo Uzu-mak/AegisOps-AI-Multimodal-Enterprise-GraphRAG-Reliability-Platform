@@ -123,7 +123,8 @@ class RealMemoryService:
         session: Session,
         memories: list[MemoryRecord],
     ) -> list[MemoryRecord]:
-        return [self._materialize_memory_for_return(session, memory) for memory in memories]
+        session.expunge_all()
+        return memories
 
     def _enqueue_projection_events(
         self,
@@ -132,100 +133,35 @@ class RealMemoryService:
         memory_id: UUID,
         operation: str,
         event_type: ProjectionEventType,
+        memory: MemoryRecord | None = None,
     ) -> None:
-        """
-        Enqueue projection work inside the same PostgreSQL transaction.
+        """Append one immutable logical envelope and two independent delivery jobs."""
+        if memory is None:
+            memory = session.scalar(select(MemoryRecord).where(MemoryRecord.id == memory_id).with_for_update())
+        if memory is None:
+            raise MemoryNotFoundError(f"Memory {memory_id} not found.")
+        memory.revision = (memory.revision or 0) + 1
+        event_id = uuid4()
+        now = datetime.now(timezone.utc)
+        payload = self._event_snapshot(memory)
+        for projection_type in (ProjectionType.QDRANT.value, ProjectionType.NEO4J.value):
+            session.add(ProjectionOutboxEvent(
+                memory_id=memory_id, projection_type=projection_type, operation=operation,
+                event_id=event_id, event_type=event_type.value, memory_version=memory.revision,
+                schema_version=2, occurred_at=now, payload=payload,
+                status=ProjectionStatus.PENDING.value,
+            ))
 
-        Idempotency rule: if a non-terminal event (pending/processing/retrying)
-        already exists for the same memory + projection + operation, do not
-        create another event. If a terminal event exists, recycle it to pending.
-        """
-        target_projection_types: list[str] = [
-            ProjectionType.QDRANT.value,
-            ProjectionType.NEO4J.value,
-        ]
-
-        existing_latest: dict[str, ProjectionOutboxEvent] = {}
-        for projection_type in target_projection_types:
-            existing = session.scalar(
-                select(ProjectionOutboxEvent)
-                .where(
-                    ProjectionOutboxEvent.memory_id == memory_id,
-                    ProjectionOutboxEvent.projection_type == projection_type,
-                    ProjectionOutboxEvent.operation == operation,
-                )
-                .order_by(ProjectionOutboxEvent.occurred_at.desc(), ProjectionOutboxEvent.created_at.desc())
-                .limit(1)
-            )
-            if existing is not None:
-                existing_latest[projection_type] = existing
-
-        active_existing = [
-            row
-            for row in existing_latest.values()
-            if row.status in {
-                ProjectionStatus.PENDING.value,
-                ProjectionStatus.PROCESSING.value,
-                ProjectionStatus.RETRYING.value,
-            }
-        ]
-
-        if active_existing:
-            shared_event_id = active_existing[0].event_id
-            memory_version = active_existing[0].memory_version
-            occurred_at = active_existing[0].occurred_at
-        else:
-            shared_event_id = uuid4()
-            memory_version = self._next_memory_version(session, memory_id)
-            occurred_at = datetime.now(timezone.utc)
-
-        for projection_type in target_projection_types:
-            existing = existing_latest.get(projection_type)
-
-            if existing is None:
-                session.add(
-                    ProjectionOutboxEvent(
-                        memory_id=memory_id,
-                        projection_type=projection_type,
-                        operation=operation,
-                        event_id=shared_event_id,
-                        event_type=event_type.value,
-                        memory_version=memory_version,
-                        schema_version=1,
-                        occurred_at=occurred_at,
-                        status=ProjectionStatus.PENDING.value,
-                    )
-                )
-                continue
-
-            if existing.status in {
-                ProjectionStatus.PENDING.value,
-                ProjectionStatus.PROCESSING.value,
-                ProjectionStatus.RETRYING.value,
-            }:
-                continue
-
-            existing.event_id = shared_event_id
-            existing.event_type = event_type.value
-            existing.memory_version = memory_version
-            existing.schema_version = 1
-            existing.occurred_at = occurred_at
-            existing.status = ProjectionStatus.PENDING.value
-            existing.retry_count = 0
-            existing.error_message = None
-            existing.completed_at = None
-            existing.kafka_publish_status = "pending"
-            existing.kafka_retry_count = 0
-            existing.kafka_error_message = None
-            existing.kafka_published_at = None
-
-    def _next_memory_version(self, session: Session, memory_id: UUID) -> int:
-        version_count = session.scalar(
-            select(func.count(distinct(ProjectionOutboxEvent.event_id))).where(
-                ProjectionOutboxEvent.memory_id == memory_id
-            )
-        )
-        return int(version_count or 0) + 1
+    @staticmethod
+    def _event_snapshot(memory: MemoryRecord) -> dict:
+        # Historical content travels with its revision; credentials never belong here.
+        return {
+            column.name: (str(value) if isinstance(value, UUID) else
+                          value.isoformat() if isinstance(value, datetime) else
+                          float(value) if hasattr(value, "as_tuple") else value)
+            for column in MemoryRecord.__table__.columns
+            for value in [getattr(memory, column.key if column.name != "metadata" else "memory_metadata")]
+        }
 
     def create_memory(self, *, data: MemoryCreateData) -> MemoryRecord:
         self._validate_create_data(data)
@@ -323,7 +259,7 @@ class RealMemoryService:
         semantic_fields_changed = any(field in patch for field in semantic_fields)
 
         with self.session_factory() as session:
-            memory = self.repository.get_by_id(session, memory_id)
+            memory = self.repository.get_for_update(session, memory_id)
             if memory is None:
                 raise MemoryNotFoundError(f"Memory {memory_id} not found.")
 
@@ -427,6 +363,7 @@ class RealMemoryService:
             replacement.supersedes_memory_id = old_memory_id
 
             existing.status = MemoryStatus.SUPERSEDED.value
+            session.flush([existing])
             self.repository.create(session, replacement)
             self.repository.update(session, existing)
             self._enqueue_projection_events(
@@ -464,7 +401,7 @@ class RealMemoryService:
 
     # ------------------------------------------------------------ bulk import
 
-    def active_source_fingerprints(self, *, source_type: str, source_ids: list[str]) -> dict[str, tuple[UUID, str | None]]:
+    def active_source_fingerprints(self, *, source_type: str, source_ids: list[str], source_system: str = "default", tenant_id: str | None = None) -> dict[str, tuple[UUID, str | None]]:
         """
         Active records from one source system, keyed "facility|source_id".
 
@@ -481,6 +418,8 @@ class RealMemoryService:
                     select(MemoryRecord.id, MemoryRecord.facility_id, MemoryRecord.source_id, MemoryRecord.memory_metadata)
                     .where(
                         MemoryRecord.source_type == source_type,
+                        MemoryRecord.tenant_id.is_not_distinct_from(tenant_id),
+                        func.coalesce(MemoryRecord.memory_metadata["import"]["source_system"].astext, "default") == source_system,
                         MemoryRecord.status == MemoryStatus.ACTIVE.value,
                         MemoryRecord.source_id.in_(chunk),
                     )
@@ -511,21 +450,34 @@ class RealMemoryService:
             self._validate_create_data(data)
 
         with self.session_factory() as session:
+            from sqlalchemy import text as sql_text
+            identities = sorted({self._import_identity(data) for data in creates + [d for _, d in supersedes]})
+            for identity in identities:
+                session.execute(sql_text("SELECT pg_advisory_xact_lock(hashtextextended(:identity, 0))"), {"identity": identity})
+            from collections import defaultdict
+            groups = defaultdict(list)
+            for data in creates:
+                groups[self._import_identity(data)].append(data)
+            for group in groups.values():
+                data = group[0]
+                for start in range(0, len(group), 1000):
+                    source_ids = [item.source_id for item in group[start:start + 1000]]
+                    existing = session.scalar(select(MemoryRecord.id).where(
+                        MemoryRecord.source_type == data.source_type,
+                        MemoryRecord.source_id.in_(source_ids),
+                        MemoryRecord.facility_id.is_not_distinct_from(data.facility_id),
+                        MemoryRecord.tenant_id.is_not_distinct_from(data.tenant_id),
+                        MemoryRecord.status == "active",
+                        func.coalesce(MemoryRecord.memory_metadata["import"]["source_system"].astext, "default") == data.memory_metadata.get("import", {}).get("source_system", "default"),
+                    ).limit(1))
+                    if existing is not None:
+                        raise MemoryConflictError("Import changed concurrently; preview and retry. Nothing was imported.")
             records = [self._build_memory_from_data(data) for data in creates]
             session.add_all(records)
             session.flush()
-            now = datetime.now(timezone.utc)
             for record in records:
-                # Brand-new ids have no prior outbox rows, so skip the
-                # idempotency lookups _enqueue_projection_events performs.
-                event_id = uuid4()
-                for projection_type in (ProjectionType.QDRANT.value, ProjectionType.NEO4J.value):
-                    session.add(ProjectionOutboxEvent(
-                        memory_id=record.id, projection_type=projection_type, operation="project",
-                        event_id=event_id, event_type=ProjectionEventType.MEMORY_CREATED.value,
-                        memory_version=1, schema_version=1, occurred_at=now,
-                        status=ProjectionStatus.PENDING.value,
-                    ))
+                self._enqueue_projection_events(session=session, memory_id=record.id, memory=record,
+                    operation="project", event_type=ProjectionEventType.MEMORY_CREATED)
             for old_id, data in supersedes:
                 existing = self.repository.get_for_update(session, old_id)
                 if existing is None or existing.status != MemoryStatus.ACTIVE.value:
@@ -535,6 +487,7 @@ class RealMemoryService:
                 replacement = self._build_memory_from_data(data)
                 replacement.supersedes_memory_id = old_id
                 existing.status = MemoryStatus.SUPERSEDED.value
+                session.flush([existing])
                 self.repository.create(session, replacement)
                 self.repository.update(session, existing)
                 self._enqueue_projection_events(
@@ -547,6 +500,15 @@ class RealMemoryService:
                 )
             session.commit()
         return {"created": len(creates), "superseded": len(supersedes)}
+
+    @staticmethod
+    def _import_identity(data: MemoryCreateData) -> str:
+        import json
+        return json.dumps([data.tenant_id, data.facility_id, data.source_type,
+            data.memory_metadata.get("import", {}).get("source_system", "default")])
+
+    def restore_memory(self, memory_id: UUID) -> MemoryRecord:
+        return self._transition_memory_status(memory_id, MemoryStatus.ACTIVE.value, outbox_operation="status_update")
 
     def _transition_memory_status(
         self,

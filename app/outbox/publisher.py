@@ -6,12 +6,13 @@ import logging
 import time
 from importlib import import_module
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Any, Callable, Protocol
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, or_, update, exists
+from sqlalchemy.orm import aliased
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -39,6 +40,7 @@ class ProjectionEvent:
     memory_version: int
     occurred_at: datetime
     schema_version: int = 1
+    memory: dict | None = None
 
     @property
     def message_key(self) -> str:
@@ -52,6 +54,7 @@ class ProjectionEvent:
             "memory_version": self.memory_version,
             "occurred_at": self.occurred_at.isoformat(),
             "schema_version": self.schema_version,
+            **({"memory": self.memory} if self.memory else {}),
         }
 
     def to_json_bytes(self) -> bytes:
@@ -69,6 +72,7 @@ class ProjectionEvent:
             memory_version=row.memory_version,
             occurred_at=occurred_at,
             schema_version=row.schema_version,
+            memory=getattr(row, "payload", None),
         )
 
 
@@ -120,81 +124,84 @@ class ProjectionEventPublisher:
         self._topic = topic
 
     def publish_batch(self, batch_size: int = 50) -> dict[str, int]:
+        total = {"published": 0, "failed": 0, "skipped": 0}
+        for _ in range(batch_size):
+            result = self._publish_next()
+            for key in total:
+                total[key] += result[key]
+            if not any(result.values()):
+                break
+        return total
+
+    def _publish_next(self) -> dict[str, int]:
+        """Claim both deliveries of a logical event, commit, then perform broker I/O."""
         stats = {"published": 0, "failed": 0, "skipped": 0}
-
+        now, token = datetime.now(timezone.utc), uuid4()
+        jobs = []
+        earlier = aliased(ProjectionOutboxEvent)
         with self._session_factory() as session:
-            rows = session.scalars(
-                select(ProjectionOutboxEvent)
-                .where(ProjectionOutboxEvent.kafka_published_at.is_(None))
-                .order_by(ProjectionOutboxEvent.occurred_at, ProjectionOutboxEvent.created_at)
-                .limit(batch_size * len(ProjectionType))
-                .with_for_update(skip_locked=True)
-            ).all()
-
-            event_rows: dict[UUID, ProjectionOutboxEvent] = {}
+            rows = session.scalars(select(ProjectionOutboxEvent).where(
+                ProjectionOutboxEvent.kafka_published_at.is_(None),
+                ~exists(select(earlier.id).where(earlier.memory_id == ProjectionOutboxEvent.memory_id,
+                    earlier.memory_version < ProjectionOutboxEvent.memory_version,
+                    earlier.kafka_published_at.is_(None))),
+                or_(ProjectionOutboxEvent.kafka_next_attempt_at.is_(None), ProjectionOutboxEvent.kafka_next_attempt_at <= now),
+                or_(ProjectionOutboxEvent.kafka_lease_until.is_(None), ProjectionOutboxEvent.kafka_lease_until < now),
+            ).order_by(ProjectionOutboxEvent.occurred_at, ProjectionOutboxEvent.memory_version)
+              .limit(2).with_for_update(skip_locked=True)).all()
+            seen = set()
             for row in rows:
-                if row.event_id in event_rows:
+                if row.event_id in seen:
                     continue
-                if not self._claim_event(session, row.event_id):
-                    stats["skipped"] += 1
-                    continue
-                event_rows[row.event_id] = row
-
-            for event_id, row in event_rows.items():
-                event = ProjectionEvent.from_outbox(row)
-                try:
-                    self._producer.publish(
-                        topic=self._topic,
-                        key=event.message_key.encode("utf-8"),
-                        value=event.to_json_bytes(),
-                    )
-                except Exception as exc:
-                    self._mark_failed(session, event_id, str(exc))
-                    stats["failed"] += 1
-                    continue
-
-                self._mark_published(session, event_id)
-                stats["published"] += 1
-
+                seen.add(row.event_id)
+                lock_key = row.event_id.int & 0x7FFFFFFFFFFFFFFF
+                if not session.execute(text("SELECT pg_try_advisory_xact_lock(:lock_key)"), {"lock_key": lock_key}).scalar_one():
+                    stats["skipped"] += 1; continue
+                # Another publisher may have leased the companion delivery row.
+                companions = session.scalars(select(ProjectionOutboxEvent).where(
+                    ProjectionOutboxEvent.event_id == row.event_id).with_for_update(skip_locked=True)).all()
+                if len(companions) != 2:
+                    stats["skipped"] += 1; continue
+                if any(c.kafka_lease_until and c.kafka_lease_until.replace(tzinfo=timezone.utc) > now for c in companions):
+                    stats["skipped"] += 1; continue
+                for companion in companions:
+                    companion.kafka_lease_token = token
+                    companion.kafka_lease_until = now + timedelta(minutes=10)
+                jobs.append((ProjectionEvent.from_outbox(row), row.kafka_retry_count or 0))
             session.commit()
-
-        logger.info("ProjectionEventPublisher batch: %s", stats)
+        for event, retries in jobs:
+            error = None
+            try:
+                self._producer.publish(topic=self._topic, key=event.message_key.encode(), value=event.to_json_bytes())
+            except Exception as exc:
+                error = type(exc).__name__ + ": broker publication failed"
+            with self._session_factory() as session:
+                rows = session.scalars(select(ProjectionOutboxEvent).where(
+                    ProjectionOutboxEvent.event_id == event.event_id,
+                    ProjectionOutboxEvent.kafka_lease_token == token,
+                ).with_for_update()).all()
+                for row in rows:
+                    row.kafka_lease_token = row.kafka_lease_until = None
+                    row.updated_at = datetime.now(timezone.utc)
+                    if error is None:
+                        row.kafka_publish_status = "published"
+                        row.kafka_published_at = row.updated_at
+                        row.kafka_error_message = None
+                    else:
+                        row.kafka_retry_count = (row.kafka_retry_count or 0) + 1
+                        row.kafka_error_message = error
+                        row.kafka_next_attempt_at = row.updated_at + timedelta(seconds=min(300, 2 ** min(retries + 1, 8)))
+                session.commit()
+            stats["published" if error is None else "failed"] += 1
         return stats
-
-    def _claim_event(self, session: Session, event_id: UUID) -> bool:
-        lock_key = event_id.int & 0x7FFFFFFFFFFFFFFF
-        claimed = session.execute(
-            text("SELECT pg_try_advisory_xact_lock(:lock_key)"),
-            {"lock_key": lock_key},
-        ).scalar_one()
-        return bool(claimed)
-
-    def _mark_published(self, session: Session, event_id: UUID) -> None:
-        now = datetime.now(timezone.utc)
-        rows = session.scalars(
-            select(ProjectionOutboxEvent).where(ProjectionOutboxEvent.event_id == event_id)
-        ).all()
-        for row in rows:
-            row.kafka_publish_status = KafkaPublishStatus.PUBLISHED.value
-            row.kafka_error_message = None
-            row.kafka_published_at = now
-            row.updated_at = now
-
-    def _mark_failed(self, session: Session, event_id: UUID, error_message: str) -> None:
-        now = datetime.now(timezone.utc)
-        rows = session.scalars(
-            select(ProjectionOutboxEvent).where(ProjectionOutboxEvent.event_id == event_id)
-        ).all()
-        for row in rows:
-            row.kafka_publish_status = KafkaPublishStatus.PENDING.value
-            row.kafka_retry_count += 1
-            row.kafka_error_message = error_message
-            row.updated_at = now
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     settings = get_settings()
+    if not settings.KAFKA_ENABLED:
+        logger.info("Kafka publication disabled by configuration")
+        return
     producer = KafkaProjectionProducer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         client_id=settings.KAFKA_CLIENT_ID,
@@ -214,7 +221,7 @@ def main() -> None:
                 logger.warning("Kafka outbox publish batch failed: %s", exc)
                 stats = {"published": 0, "failed": 1, "skipped": 0}
 
-            if stats["published"] == 0 and stats["failed"] == 0:
+            if stats["published"] == 0:
                 time.sleep(settings.OUTBOX_PUBLISHER_POLL_SECONDS)
     finally:
         producer.close()

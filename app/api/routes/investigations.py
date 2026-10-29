@@ -138,7 +138,10 @@ def record_finding(
     evidence_records = []
     for mid in request.evidence_memory_ids:
         try:
-            evidence_records.append(service.get_memory(mid))
+            evidence = service.get_memory(mid)
+            if evidence.status != "active":
+                raise HTTPException(status_code=422, detail="Evidence must be active; disputed, archived and superseded records cannot support findings")
+            evidence_records.append(evidence)
         except MemoryNotFoundError:
             raise HTTPException(status_code=422, detail=f"Evidence record {mid} does not exist")
     context = {k: getattr(request, k) for k in ("asset_id", "facility_id", "component_id", "incident_id")}

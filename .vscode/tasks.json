@@ -1,0 +1,8 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label": "AegisOps: Docker build", "type": "process", "command": "docker", "args": ["compose", "build"], "problemMatcher": []},
+    {"label": "AegisOps: Docker start", "type": "process", "command": "docker", "args": ["compose", "up", "-d", "--build"], "problemMatcher": []},
+    {"label": "AegisOps: infrastructure for host debug", "type": "process", "command": "docker", "args": ["compose", "up", "-d", "postgres", "qdrant", "neo4j", "migrate", "projection-worker"], "problemMatcher": []}
+  ]
+}

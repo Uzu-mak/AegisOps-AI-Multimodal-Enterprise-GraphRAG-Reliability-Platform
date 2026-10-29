@@ -162,16 +162,11 @@ def test_create_memory_enqueues_projection_outbox_events(service):
     assert all(row.kafka_published_at is None for row in rows)
 
 
-def test_projection_enqueue_is_idempotent_while_pending(service):
-    record = service.create_memory(data=make_data(title="Idempotent outbox"))
-
-    service.update_memory(record.id, {"title": "Idempotent outbox v2"})
-
+def test_projection_enqueue_retains_each_mutation_while_pending(service):
+    record = service.create_memory(data=make_data(title="Original"))
+    service.update_memory(record.id, {"title": "Updated"})
     with SessionLocal() as session:
-        rows = session.scalars(
-            select(ProjectionOutboxEvent).where(ProjectionOutboxEvent.memory_id == record.id)
-        ).all()
-
-    assert len(rows) == 2
-    assert {row.projection_type for row in rows} == {"qdrant", "neo4j"}
-    assert len({row.event_id for row in rows}) == 1
+        rows = session.scalars(select(ProjectionOutboxEvent).where(ProjectionOutboxEvent.memory_id == record.id)).all()
+    assert len(rows) == 4
+    assert {row.memory_version for row in rows} == {1, 2}
+    assert {row.payload["title"] for row in rows} == {"Original", "Updated"}

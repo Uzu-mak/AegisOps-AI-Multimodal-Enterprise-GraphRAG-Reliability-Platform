@@ -66,7 +66,7 @@ class TestCitationAccuracy:
 
     def test_no_citations(self):
         answer = "No references."
-        assert citation_accuracy(answer, evidence_count=3) == 1.0
+        assert citation_accuracy(answer, evidence_count=3) == 0.0
 
 
 class TestEvaluationRunner:

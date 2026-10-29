@@ -98,6 +98,7 @@ class Neo4jGraphMemoryIndex(GraphMemoryIndex):
             MERGE (m:Memory {memory_id: $memory_id})
             SET m.memory_type  = $memory_type,
                 m.status       = $status,
+                m.importance   = $importance,
                 m.tenant_id    = $tenant_id,
                 m.created_at   = $created_at,
                 m.observed_at  = $observed_at
@@ -105,6 +106,7 @@ class Neo4jGraphMemoryIndex(GraphMemoryIndex):
             memory_id=memory_id_str,
             memory_type=str(memory.memory_type),
             status=str(memory.status),
+            importance=float(memory.importance or 0),
             tenant_id=memory.tenant_id,
             created_at=memory.created_at.isoformat() if memory.created_at else None,
             observed_at=memory.observed_at.isoformat() if memory.observed_at else None,
@@ -260,6 +262,7 @@ class Neo4jGraphMemoryIndex(GraphMemoryIndex):
                     """,
                     memory_id=str(memory.id),
                     status=str(memory.status),
+            importance=float(memory.importance or 0),
                 )
             logger.debug(f"Updated status of memory {memory.id} to {memory.status}")
         except Exception as exc:
@@ -336,55 +339,34 @@ class Neo4jGraphMemoryIndex(GraphMemoryIndex):
 
         try:
             with self._driver.session(database=self._database) as session:
-                # --- Strategy 1: entity-mediated hops ---
-                # The path length integer is validated above; f-string here is safe.
-                entity_result = session.run(
+                # Rank the combined candidate set before applying the global limit.
+                rows = session.run(
                     f"""
                     MATCH (start:Memory {{memory_id: $start_id}})
-                    MATCH (start)-[:ABOUT_ASSET|ABOUT_COMPONENT|PART_OF_INCIDENT|OBSERVED_AT|BELONGS_TO_TEAM*1..{entity_path_len}]-(related:Memory)
+                    CALL {{
+                      WITH start
+                      MATCH (start)-[:ABOUT_ASSET|ABOUT_COMPONENT|PART_OF_INCIDENT|OBSERVED_AT|BELONGS_TO_TEAM*1..{entity_path_len}]-(related:Memory)
+                      RETURN related
+                      UNION
+                      WITH start
+                      MATCH (start)-[:SOURCED_FROM]->(src:Source)<-[:SOURCED_FROM]-(related:Memory)
+                      WHERE src.source_id IS NOT NULL
+                      RETURN related
+                      UNION
+                      WITH start
+                      MATCH (start)-[:SUPERSEDES*1..{max_hops}]-(related:Memory)
+                      RETURN related
+                    }}
+                    WITH DISTINCT related
                     WHERE related.memory_id <> $start_id
-                    RETURN DISTINCT related.memory_id AS memory_id
-                    ORDER BY memory_id
+                    ORDER BY coalesce(related.importance, 0) DESC,
+                             coalesce(related.observed_at, related.created_at) DESC,
+                             related.memory_id
                     LIMIT $limit
-                    """,
-                    start_id=start_id,
-                    limit=limit,
+                    RETURN related.memory_id AS memory_id
+                    """, start_id=start_id, limit=limit,
                 )
-                entity_ids = {row["memory_id"] for row in entity_result}
-
-                # Source links are only meaningful when a real source_id exists.
-                source_result = session.run(
-                    """
-                    MATCH (start:Memory {memory_id: $start_id})-[:SOURCED_FROM]->(src:Source)<-[:SOURCED_FROM]-(related:Memory)
-                    WHERE related.memory_id <> $start_id
-                      AND src.source_id IS NOT NULL
-                    RETURN DISTINCT related.memory_id AS memory_id
-                    ORDER BY memory_id
-                    LIMIT $limit
-                    """,
-                    start_id=start_id,
-                    limit=limit,
-                )
-                source_ids = {row["memory_id"] for row in source_result}
-
-                # --- Strategy 2: SUPERSEDES chain ---
-                supersedes_result = session.run(
-                    f"""
-                    MATCH (start:Memory {{memory_id: $start_id}})
-                    MATCH (start)-[:SUPERSEDES*1..{max_hops}]-(related:Memory)
-                    WHERE related.memory_id <> $start_id
-                    RETURN DISTINCT related.memory_id AS memory_id
-                    ORDER BY memory_id
-                    LIMIT $limit
-                    """,
-                    start_id=start_id,
-                    limit=limit,
-                )
-                supersedes_ids = {row["memory_id"] for row in supersedes_result}
-
-            combined = entity_ids | source_ids | supersedes_ids
-            combined.discard(start_id)
-            return sorted(UUID(uid) for uid in combined)[:limit]
+                return [UUID(row["memory_id"]) for row in rows]
 
         except GraphProjectionError:
             raise

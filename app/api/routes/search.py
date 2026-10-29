@@ -89,6 +89,7 @@ class GraphRelatedResponse(BaseModel):
 
 
 class GraphRAGResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
     question: str
     answer: str
     evidence_count: int
@@ -210,6 +211,7 @@ def hybrid_retrieve(
 def graph_related_memories(
     request: GraphRelatedRequest,
     graph_index: Optional[Neo4jGraphMemoryIndex] = Depends(get_graph_memory_index),
+    retriever: HybridMemoryRetriever = Depends(get_hybrid_retriever),
 ) -> GraphRelatedResponse:
     """Return memory UUIDs structurally related in Neo4j."""
     from uuid import UUID as PUUID
@@ -234,6 +236,8 @@ def graph_related_memories(
     related = graph_index.get_related_memory_ids(
         mid, max_hops=request.max_hops, limit=request.limit
     )
+    canonical = retriever._hydrate_from_postgres(related) or {}
+    related = [mid for mid in related if mid in canonical and canonical[mid].status == "active"]
     metrics_collector.observe_graph_traversal((time.monotonic() - t0) * 1000)
     return GraphRelatedResponse(
         anchor_memory_id=request.memory_id,

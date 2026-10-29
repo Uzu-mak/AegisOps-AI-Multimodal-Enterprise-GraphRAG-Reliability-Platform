@@ -70,7 +70,7 @@ def run_evaluation(
     unavailable = {m: [s for s in needs[m] if not up[s]] for m in request.modes}
     runnable = [m for m in dict.fromkeys(request.modes) if not unavailable[m]]
 
-    workflow = AegisOpsWorkflow(GraphRAGPipeline(retriever=retriever, llm_provider=llm_provider, context_limit=5))
+    workflow = AegisOpsWorkflow(GraphRAGPipeline(retriever=retriever, llm_provider=llm_provider, context_limit=request.k))
 
     def retrieval_fn(question: str, mode: str):
         if mode == "agentic":

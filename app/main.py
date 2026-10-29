@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -47,6 +47,8 @@ app.include_router(import_router)
 app.include_router(evaluation_router)
 app.include_router(system_router)
 register_exception_handlers(app)
+from app.core.security import identity_middleware
+app.middleware("http")(identity_middleware)
 
 # Web console (static SPA that talks to /api/v1). Replaces the Streamlit UI.
 _CONSOLE_DIR = Path(__file__).resolve().parent / "console" / "static"
@@ -70,18 +72,21 @@ async def instrument_http_requests(request: Request, call_next):
         metrics_collector.request_finished(started_at, status_code)
 
 
-@app.get("/health")
-def healthcheck() -> dict[str, str]:
-    db_status = "connected"
+@app.get("/live")
+def liveness():
+    return {"status": "ok"}
 
+@ app.get("/health")
+@ app.get("/ready")
+def healthcheck():
+    """Readiness requires canonical tables and the schema expected by this build."""
     try:
         with SessionLocal() as session:
-            session: Session
-            session.execute(text("SELECT 1"))
-    except (SQLAlchemyError, OSError, ValueError) as exc:
-        db_status = f"disconnected: {exc}"
-
-    if db_status.startswith("connected"):
-        return {"status": "ok", "database": "connected"}
-
-    return {"status": "degraded", "database": db_status}
+            session.execute(text("SELECT revision FROM memories LIMIT 0"))
+            session.execute(text("SELECT payload, next_attempt_at FROM projection_outbox LIMIT 0"))
+            revision = session.scalar(text("SELECT version_num FROM alembic_version"))
+            if revision != "20261028_0004":
+                raise RuntimeError("Schema upgrade required")
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "not_ready", "database": "unavailable_or_schema_upgrade_required"})
+    return {"status": "ok", "database": "connected", "schema": revision}

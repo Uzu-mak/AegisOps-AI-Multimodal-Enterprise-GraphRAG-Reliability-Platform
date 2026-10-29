@@ -181,13 +181,14 @@ async function api(path, { method = "GET", body, timeout = 20000, params } = {})
   try {
     const res = await fetch(url, {
       method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
+      headers: { ...(body ? { "Content-Type": "application/json" } : {}), ...(sessionStorage.getItem("aegis-token") ? { Authorization: `Bearer ${sessionStorage.getItem("aegis-token")}` } : {}) },
       body: body ? JSON.stringify(body) : undefined,
       signal: ctrl.signal,
     });
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (res.status === 401) showSignIn();
     if (!res.ok) return { ok: false, status: res.status, data, error: describeError(res.status, data) };
     return { ok: true, status: res.status, data };
   } catch (err) {
@@ -214,7 +215,7 @@ function describeError(status, data) {
 async function fetchAllMemories(params = {}) {
   const out = [];
   const pageSize = 200;
-  for (let offset = 0; offset < 2000; offset += pageSize) {
+  for (let offset = 0; ; offset += pageSize) {
     const r = await api("/memories", { params: { ...params, limit: pageSize, offset } });
     if (!r.ok) return { ok: false, error: r.error, items: out };
     const items = r.data?.items || [];
@@ -367,7 +368,8 @@ async function showMemory(id, { onChange } = {}) {
             busy(e.currentTarget, true);
             const res = await api(`/memories/${m.id}/${action}`, { method: "POST", body: {} });
             busy(e.currentTarget, false);
-            if (!res.ok) return toast(res.error, true);
+            if (res.status === 401) showSignIn();
+    if (!res.ok) return toast(res.error, true);
             await refresh(done);
           } }, verb),
           h("button", { class: "btn", type: "button", onclick: () => put(confirmArea) }, "Keep as is"),
@@ -492,6 +494,7 @@ function memoryForm({ supersede = null, defaults = {}, title = null, onSaved } =
       ? await api(`/memories/${supersede.id}/supersede`, { method: "POST", body: { replacement: payload } })
       : await api("/memories", { method: "POST", body: payload });
     busy(submit, false);
+    if (res.status === 401) showSignIn();
     if (!res.ok) return toast(res.error, true);
     closeDialog();
     toast(supersede ? "Replacement saved; the original is now superseded" : "Record saved");
@@ -1197,6 +1200,7 @@ function findingForm(d, anchor) {
       answer_was_synthetic: d.is_synthetic_response,
     } });
     busy(submit, false);
+    if (res.status === 401) showSignIn();
     if (!res.ok) return toast(res.error, true);
     closeDialog();
     const rec = res.data;
@@ -1561,7 +1565,7 @@ async function viewSystem() {
           const v = svc[k] || {};
           const details = k === "llm"
             ? [v.provider && `Configured: ${v.provider} (${v.model})`, v.active_model && `In use: ${v.active_model}`, v.error].filter(Boolean).join(". ")
-            : [v.url || v.uri, v.error, typeof v.retry_in_seconds === "number" ? `Next attempt in ${Math.ceil(v.retry_in_seconds)} s` : null].filter(Boolean).join(". ");
+            : [v.url || v.uri, v.error, v.projection_error, typeof v.retry_in_seconds === "number" ? `Next attempt in ${Math.ceil(v.retry_in_seconds)} s` : null].filter(Boolean).join(". ");
           return h("tr", null,
             h("th", { scope: "row" }, label), h("td", null, role),
             h("td", null, k === "llm" && v.synthetic ? stateChip("Test provider", "info") : serviceChip(v.status)),
@@ -1693,3 +1697,15 @@ document.addEventListener("keydown", (e) => {
 
 setInterval(() => { if (!document.hidden) refreshHealth(); }, 20000);
 render();
+
+function showSignIn() {
+  if (document.getElementById("api-signin")) return;
+  const box = document.createElement("dialog"); box.id = "api-signin";
+  const form = document.createElement("form");
+  const label = document.createElement("label"); label.textContent = "API access token ";
+  const input = document.createElement("input"); input.type = "password"; input.required = true; input.autocomplete = "off";
+  const submit = document.createElement("button"); submit.type = "submit"; submit.textContent = "Sign in";
+  label.append(input); form.append(label, submit); box.append(form); document.body.append(box);
+  form.addEventListener("submit", event => { event.preventDefault(); sessionStorage.setItem("aegis-token", input.value); box.close(); box.remove(); render(); });
+  box.showModal(); input.focus();
+}

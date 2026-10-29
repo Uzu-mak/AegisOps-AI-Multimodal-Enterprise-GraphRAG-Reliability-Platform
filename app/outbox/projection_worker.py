@@ -144,7 +144,16 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
     parser = argparse.ArgumentParser(description="AegisOps outbox projection worker")
     parser.add_argument("--reproject-all", action="store_true",
                         help="Re-project every record once (e.g. after changing EMBEDDING_PROVIDER) and exit.")
+    parser.add_argument("--retry-failed", action="store_true", help="Requeue failed projection jobs without changing canonical records")
     args = parser.parse_args(argv)
+    if args.retry_failed:
+        from sqlalchemy import update
+        from app.outbox.models import ProjectionOutboxEvent
+        with SessionLocal() as session:
+            result = session.execute(update(ProjectionOutboxEvent).where(ProjectionOutboxEvent.status == "failed").values(status="pending", retry_count=0, next_attempt_at=None, lease_token=None, lease_until=None))
+            session.commit()
+            print(f"Requeued {result.rowcount} projection jobs")
+        return 0
     if args.reproject_all:
         logging.basicConfig(level=logging.WARNING)
         connections = get_connections()

@@ -43,24 +43,25 @@ class QdrantSemanticIndex(SemanticMemoryIndex):
         self._ensure_collection_exists()
 
     def _ensure_collection_exists(self) -> None:
-        """Create collection if it doesn't exist."""
+        """Only create on a confirmed 404; connectivity and schema errors differ."""
         try:
-            self.client.get_collection(self.collection_name)
-        except Exception:
-            # Collection doesn't exist; create it
-            logger.info(f"Creating Qdrant collection: {self.collection_name}")
+            info = self.client.get_collection(self.collection_name)
+        except Exception as exc:
+            if getattr(exc, "status_code", None) != 404:
+                raise SemanticIndexError("Cannot inspect Qdrant collection; check connectivity and permissions") from exc
             try:
-                self.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(
-                        size=self.embedding_provider.get_dimension(),
-                        distance=Distance.COSINE,
-                    ),
-                )
-            except Exception as exc:
-                raise SemanticIndexError(
-                    f"Failed to create collection {self.collection_name}: {exc}"
-                ) from exc
+                self.client.create_collection(collection_name=self.collection_name,
+                    vectors_config=VectorParams(size=self.embedding_provider.get_dimension(), distance=Distance.COSINE))
+                return
+            except Exception as create_exc:
+                # Another API/worker may have created the collection concurrently.
+                if getattr(create_exc, "status_code", None) != 409:
+                    raise SemanticIndexError("Cannot initialize Qdrant collection") from create_exc
+                info = self.client.get_collection(self.collection_name)
+        vectors = info.config.params.vectors
+        size = getattr(vectors, "size", None)
+        if isinstance(size, int) and size != self.embedding_provider.get_dimension():
+            raise SemanticIndexError("Qdrant vector dimension differs from the embedding provider; select a new collection and reproject")
 
     def index_memory(
         self, memory_id: UUID, text: str, record: VectorRecord
@@ -94,6 +95,7 @@ class QdrantSemanticIndex(SemanticMemoryIndex):
             self.client.upsert(
                 collection_name=self.collection_name,
                 points=[point],
+                wait=True,
             )
 
             logger.debug(f"Indexed memory {memory_id} in Qdrant")

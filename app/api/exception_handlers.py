@@ -13,6 +13,11 @@ from app.services.exceptions import (
 
 
 def register_exception_handlers(app) -> None:
+    from sqlalchemy.exc import IntegrityError
+    @app.exception_handler(IntegrityError)
+    async def integrity_conflict(request: Request, exc):
+        return JSONResponse(status_code=409, content={"detail": "Concurrent or duplicate record change; refresh and retry"})
+
     @app.exception_handler(AegisOpsError)
     async def aegisops_exception_handler(request: Request, exc: AegisOpsError):
         if isinstance(exc, MemoryNotFoundError):

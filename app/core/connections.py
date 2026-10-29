@@ -63,6 +63,7 @@ class ProjectionConnections:
         self._graph_bootstrapped = False
         self._semantic_index: Any = None
         self._graph_index: Any = None
+        self._projection_errors: dict[str, str] = {}
 
     # ------------------------------------------------------------------ core
     @property
@@ -78,6 +79,8 @@ class ProjectionConnections:
         with slot.lock:
             if slot.resource is not None:
                 return slot.resource
+            if slot.failed_at is not None and self._clock() - slot.failed_at < self.retry_seconds:
+                return None
             try:
                 slot.resource = factory(self._settings)
                 slot.connected_at = self._clock()
@@ -124,9 +127,10 @@ class ProjectionConnections:
                 embedding_provider=embedding_provider,
                 collection_name=self._settings.QDRANT_COLLECTION_NAME,
             )
+            self._projection_errors.pop("qdrant", None)
             return self._semantic_index
         except Exception as exc:  # noqa: BLE001
-            self._invalidate(self._qdrant, exc, _close_quietly)
+            self._projection_errors["qdrant"] = type(exc).__name__ + ": projection initialization failed"
             self._semantic_index = None
             return None
 
@@ -144,9 +148,10 @@ class ProjectionConnections:
             index.bootstrap_constraints()
             self._graph_index = index
             self._graph_bootstrapped = True
+            self._projection_errors.pop("neo4j", None)
             return index
         except Exception as exc:  # noqa: BLE001
-            self._invalidate(self._neo4j, exc, _close_quietly)
+            self._projection_errors["neo4j"] = type(exc).__name__ + ": projection initialization failed"
             self._graph_index = None
             self._graph_bootstrapped = False
             return None
@@ -174,7 +179,7 @@ class ProjectionConnections:
                     "retry_in_seconds": round(retry_in, 1) if retry_in is not None else None, **target}
         try:
             check(resource)
-            return {"status": "healthy", **target}
+            return {"status": "healthy", "projection_error": self._projection_errors.get(name), **target}
         except Exception as exc:  # noqa: BLE001
             self._invalidate(slot, exc, closer)
             if name == "neo4j":
@@ -209,7 +214,8 @@ def _default_qdrant_factory(settings: Settings) -> Any:
     from qdrant_client import QdrantClient
 
     timeout = max(1, int(round(settings.PROJECTION_CONNECT_TIMEOUT_SECONDS)))
-    client = QdrantClient(url=settings.QDRANT_URL, timeout=timeout, check_compatibility=False)
+    import os
+    client = QdrantClient(url=settings.QDRANT_URL, api_key=os.getenv("QDRANT_API_KEY") or None, timeout=timeout)
     try:
         client.get_collections()
     except Exception:

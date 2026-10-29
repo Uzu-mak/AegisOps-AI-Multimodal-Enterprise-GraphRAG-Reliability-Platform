@@ -1,165 +1,95 @@
-"""
-OutboxWorker — processes pending projection outbox events.
-
-Picks up PENDING events from PostgreSQL, attempts projection to
-Qdrant/Neo4j, and marks them COMPLETED or FAILED with bounded retry.
-
-This provides eventual consistency for projections after transient failures.
-PostgreSQL state is never corrupted by projection failures.
-"""
+"""Leased projection jobs: commit claims before network I/O; recover expired claims."""
 from __future__ import annotations
-
 import logging
-import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
-
-from sqlalchemy import select, update
-from sqlalchemy.orm import Session
-
-from app.outbox.models import ProjectionOutboxEvent, ProjectionStatus, ProjectionType
-
+from uuid import uuid4
+from sqlalchemy import or_, select
+from app.outbox.models import ProjectionOutboxEvent as Event, ProjectionStatus, ProjectionType
 logger = logging.getLogger(__name__)
-
-# Type aliases
-SessionFactory = Callable[[], Session]
-_DEFERRED = "__deferred__"
-ProjectionFn = Callable[[str, str], None]  # (memory_id_str, operation) -> None
-
-
+SessionFactory = Callable
+ProjectionFn = Callable[[str, str], None]
 class ProjectionDeferred(Exception):
-    """
-    Raised by a projection function when its store is unreachable.
-
-    The event is left in its previous state without consuming a retry, so a
-    long outage does not push every event to FAILED.
-    """
-
-
+    """Store unavailable: reschedule without spending a retry."""
 class OutboxWorker:
-    """
-    Processes pending outbox events with bounded retry and backoff.
-
-    Usage:
-        worker = OutboxWorker(
-            session_factory=SessionLocal,
-            qdrant_fn=...,
-            neo4j_fn=...,
-        )
-        worker.process_batch(batch_size=50)
-    """
-
-    def __init__(
-        self,
-        session_factory: SessionFactory,
-        qdrant_fn: Optional[ProjectionFn] = None,
-        neo4j_fn: Optional[ProjectionFn] = None,
-        base_backoff_seconds: float = 1.0,
-    ) -> None:
+    def __init__(self, session_factory, qdrant_fn=None, neo4j_fn=None,
+                 base_backoff_seconds=2.0, lease_seconds=120, clock=None):
         self._session_factory = session_factory
-        self._qdrant_fn = qdrant_fn
-        self._neo4j_fn = neo4j_fn
+        self._qdrant_fn, self._neo4j_fn = qdrant_fn, neo4j_fn
         self._base_backoff = base_backoff_seconds
+        self._lease_seconds = lease_seconds
+        self._clock = clock or (lambda: datetime.now(timezone.utc))
 
-    def process_batch(self, batch_size: int = 50) -> dict[str, int]:
-        """
-        Process a batch of pending outbox events.
+    def process_batch(self, batch_size=50):
+        total = dict(completed=0, failed=0, skipped=0, deferred=0)
+        for _ in range(batch_size):
+            stats = self._process_one()
+            for key in total:
+                total[key] += stats[key]
+            if not any(stats.values()):
+                break
+        return total
 
-        Returns a summary: {completed, failed, skipped}.
-        """
-        stats = {"completed": 0, "failed": 0, "skipped": 0, "deferred": 0}
-
+    def _process_one(self):
+        stats = dict(completed=0, failed=0, skipped=0, deferred=0)
+        now, token = self._clock(), uuid4()
         with self._session_factory() as session:
-            pending = session.scalars(
-                select(ProjectionOutboxEvent)
-                .where(
-                    ProjectionOutboxEvent.status.in_(
-                        [ProjectionStatus.PENDING.value, ProjectionStatus.RETRYING.value]
-                    )
-                )
-                .order_by(ProjectionOutboxEvent.occurred_at, ProjectionOutboxEvent.created_at)
-                .limit(batch_size)
-                .with_for_update(skip_locked=True)
-            ).all()
-
-            for event in pending:
-                if event.retry_count >= event.max_retries:
-                    event.status = ProjectionStatus.FAILED.value
-                    event.error_message = "Max retries exceeded"
-                    event.updated_at = datetime.now(timezone.utc)
-                    stats["failed"] += 1
-                    continue
-
-                previous_status = event.status
-                # Mark as processing
-                event.status = ProjectionStatus.PROCESSING.value
-                event.updated_at = datetime.now(timezone.utc)
-                session.flush()
-
-                success, error = self._run_projection(event)
-
-                if error is _DEFERRED:
-                    event.status = previous_status
-                    stats["deferred"] += 1
-                elif success:
-                    event.status = ProjectionStatus.COMPLETED.value
-                    event.completed_at = datetime.now(timezone.utc)
-                    stats["completed"] += 1
-                else:
-                    event.retry_count += 1
-                    if event.retry_count >= event.max_retries:
-                        event.status = ProjectionStatus.FAILED.value
-                        stats["failed"] += 1
-                    else:
-                        event.status = ProjectionStatus.RETRYING.value
-                        stats["skipped"] += 1
-                    event.error_message = error
-                event.updated_at = datetime.now(timezone.utc)
-
+            rows = session.scalars(select(Event).where(
+                or_(Event.status.in_(["pending", "retrying"]),
+                    (Event.status == "processing") & (Event.lease_until < now)),
+                or_(Event.next_attempt_at.is_(None), Event.next_attempt_at <= now),
+            ).order_by(Event.next_attempt_at.asc().nullsfirst(), Event.occurred_at, Event.id)
+              .limit(1).with_for_update(skip_locked=True)).all()
+            jobs = []
+            for row in rows:
+                from sqlalchemy import text
+                if not session.execute(text("SELECT pg_try_advisory_xact_lock(:key)"), {"key": row.memory_id.int & 0x7FFFFFFFFFFFFFFF}).scalar_one():
+                    stats["skipped"] += 1; continue
+                active = session.scalar(select(Event.id).where(Event.memory_id == row.memory_id,
+                    Event.id != row.id, Event.status == "processing", Event.lease_until > now).limit(1))
+                if active is not None:
+                    row.next_attempt_at = now + timedelta(seconds=2)
+                    stats["skipped"] += 1; continue
+                if row.retry_count >= row.max_retries:
+                    row.status = "failed"; stats["failed"] += 1; continue
+                row.status, row.lease_token = "processing", token
+                row.lease_until = now + timedelta(seconds=self._lease_seconds)
+                jobs.append((row.id, str(row.memory_id), row.operation, row.projection_type))
             session.commit()
-
-        if stats["completed"] or stats["failed"] or stats["skipped"]:
-            logger.info(f"OutboxWorker batch: {stats}")
-        else:
-            logger.debug(f"OutboxWorker batch: {stats}")
+        for job_id, memory_id, operation, projection_type in jobs:
+            error, deferred = None, False
+            handler = {"qdrant": self._qdrant_fn, "neo4j": self._neo4j_fn}.get(projection_type)
+            try:
+                if handler is None:
+                    raise RuntimeError(f"No projection handler for {projection_type}")
+                handler(memory_id, operation)
+            except ProjectionDeferred as exc:
+                error, deferred = str(exc), True
+            except Exception as exc:
+                error = str(exc)
+            with self._session_factory() as session:
+                row = session.scalar(select(Event).where(Event.id == job_id, Event.lease_token == token).with_for_update())
+                if row is None:
+                    stats["skipped"] += 1; continue
+                now = self._clock()
+                row.lease_token = row.lease_until = None
+                row.updated_at = now
+                if error is None:
+                    row.status, row.completed_at, row.error_message = "completed", now, None
+                    row.next_attempt_at = None; stats["completed"] += 1
+                elif deferred:
+                    row.status, row.error_message = "pending", error
+                    row.next_attempt_at = now + timedelta(seconds=max(15, self._base_backoff))
+                    stats["deferred"] += 1
+                else:
+                    row.retry_count += 1; row.error_message = error
+                    row.status = "failed" if row.retry_count >= row.max_retries else "retrying"
+                    row.next_attempt_at = now + timedelta(seconds=min(300, self._base_backoff * 2 ** (row.retry_count - 1)))
+                    stats["failed" if row.status == "failed" else "skipped"] += 1
+                session.commit()
         return stats
 
-    def _run_projection(
-        self, event: ProjectionOutboxEvent
-    ) -> tuple[bool, Optional[str]]:
-        """Run the appropriate projection function for an event."""
-        memory_id_str = str(event.memory_id)
-        proj_type = event.projection_type
-
-        try:
-            if proj_type == ProjectionType.QDRANT.value and self._qdrant_fn:
-                self._qdrant_fn(memory_id_str, event.operation)
-            elif proj_type == ProjectionType.NEO4J.value and self._neo4j_fn:
-                self._neo4j_fn(memory_id_str, event.operation)
-            else:
-                # No handler registered — mark complete to avoid infinite retry
-                logger.debug(
-                    f"No handler for projection_type={proj_type}; marking complete"
-                )
-            return True, None
-        except ProjectionDeferred:
-            return False, _DEFERRED
-        except Exception as exc:
-            logger.warning(
-                f"Projection failed for event {event.id} "
-                f"(memory={memory_id_str} type={proj_type}): {exc}"
-            )
-            return False, str(exc)
-
-    def get_stats(self) -> dict[str, int]:
-        """Return counts by status from the outbox table."""
+    def get_stats(self):
+        from sqlalchemy import func
         with self._session_factory() as session:
-            from sqlalchemy import func
-
-            rows = session.execute(
-                select(
-                    ProjectionOutboxEvent.status,
-                    func.count(ProjectionOutboxEvent.id).label("count"),
-                ).group_by(ProjectionOutboxEvent.status)
-            ).all()
-            return {row.status: row.count for row in rows}
+            return dict(session.execute(select(Event.status, func.count(Event.id)).group_by(Event.status)).all())

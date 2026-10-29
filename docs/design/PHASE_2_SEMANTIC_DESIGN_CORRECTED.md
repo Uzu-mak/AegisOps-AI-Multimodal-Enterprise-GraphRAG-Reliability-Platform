@@ -1,3 +1,5 @@
+> Historical design record. Current implementation and launch guidance: [Local development](../LOCAL_DEVELOPMENT.md). Proposed RabbitMQ and broker-driven projections are not the current architecture.
+
 # Phase 2 Design: Semantic Operational Memory (CORRECTED)
 
 ## Overview

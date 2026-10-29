@@ -131,7 +131,7 @@ def list_memories(
     asset_id: str | None = Query(default=None),
     facility_id: str | None = Query(default=None),
     source_type: str | None = Query(default=None),
-    limit: int | None = Query(default=None, ge=1),
+    limit: int | None = Query(default=200, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     service: MemoryService = Depends(get_memory_service),
 ) -> MemoryListResponse:
@@ -319,3 +319,8 @@ def supersede_memory(
             outcome="failed",
         )
         raise
+
+
+@router.post("/memories/{memory_id}/restore", response_model=MemoryResponse)
+def restore_memory(memory_id: UUID, service: MemoryService = Depends(get_memory_service)):
+    return memory_to_response(service.restore_memory(memory_id))

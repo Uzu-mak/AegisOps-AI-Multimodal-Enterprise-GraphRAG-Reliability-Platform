@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Numeric,
+    Integer,
     String,
     Text,
     func,
@@ -43,6 +44,7 @@ class MemoryRecord(Base):
     __tablename__ = "memories"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     memory_type: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default=MemoryStatus.ACTIVE.value)
 
@@ -89,3 +91,11 @@ class MemoryRecord(Base):
         nullable=False,
         default=dict,
     )
+
+
+# A partial expression index prevents racing imports from duplicating an active WO.
+from sqlalchemy import Index, text
+Index("uq_active_work_order_identity",
+      text("COALESCE(tenant_id, '')"), text("COALESCE(facility_id, '')"),
+      text("COALESCE(metadata->'import'->>'source_system', 'default')"), MemoryRecord.source_id,
+      unique=True, postgresql_where=text("source_type = 'work_order' AND status = 'active'"))
