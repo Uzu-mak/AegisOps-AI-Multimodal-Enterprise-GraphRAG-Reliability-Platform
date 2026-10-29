@@ -1,11 +1,16 @@
 import { busy, empty, fmtWhen, notice, num, pageHead, pct, scoreBar, shortId, skeleton, stateChip, toast, typeLabel } from "../components/ui.js";
 import { dotWhisker, heatStep, logBars, withTooltip } from "../components/charts.js";
 import { tabs } from "../components/tabs.js";
+import { managerSummary } from "./evaluation-summary.js";
 import { showMemory } from "../components/records.js";
 import { bootstrapMean, evidenceStrength, leakage, shuffled } from "../lib/evalmath.js";
 import { api, fetchAllMemories } from "../lib/api.js";
 import { h, put, s } from "../lib/dom.js";
 import { evalState, href, main, navLink, saveEvalCases, state } from "../lib/state.js";
+
+// Readout values must fit one line: the time is the value, the day goes in the note.
+const runTime = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "—" : d.toLocaleTimeString(undefined, { timeStyle: "short" }); };
+const runDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { dateStyle: "medium" }); };
 
 /* -------------------------------------------------------- evaluation */
 
@@ -56,6 +61,8 @@ export async function viewEvaluation(params) {
   const questionsHost = h("div", { class: "stack" });
   const failuresHost = h("div", { class: "stack" });
   const runsHost = h("div", { class: "stack" });
+  const summaryHost = h("div", { class: "stack" });
+  const drawSummary = () => managerSummary(summaryHost, { latest: evalState.results, history: history.runs, items });
   const runDetail = h("div", { class: "stack", "aria-live": "polite" });
 
   const download = (name, text, type) => {
@@ -84,6 +91,7 @@ export async function viewEvaluation(params) {
     drawFailures();
     await loadHistory();
     drawRuns();
+    drawSummary();
     if (!r.data.persisted) toast("This run wasn't saved to history (only writers and administrators save runs, or the history store is unavailable).", true);
     if (slow) toast("Investigation mode was left out: this many questions would pass the 2-minute limit. Run it from Advanced with fewer questions.", true);
   };
@@ -188,7 +196,7 @@ export async function viewEvaluation(params) {
     put(host,
       h("div", { class: "run-head" },
         h("h2", null, "Latest run"),
-        h("p", { class: "toolbar-note" }, `${fmtWhen(res.generated_at)}, run in this browser, ${n} question${n === 1 ? "" : "s"}.`)),
+        h("p", { class: "toolbar-note" }, `${fmtWhen(res.generated_at)}, ${res.persisted ? "saved to run history" : "kept in this browser only"}, ${n} question${n === 1 ? "" : "s"}.`)),
       !semantic ? notice("warn", "Vector scores come from a test embedding",
         "The API is running a non-semantic embedding, so Meaning, Relationships and Both rank records by hashed text, not by meaning. Set EMBEDDING_PROVIDER=openai, re-project, and run again before quoting these numbers.",
         [navLink("Open System health", "system", {}, "btn")]) : null,
@@ -261,7 +269,7 @@ export async function viewEvaluation(params) {
         h("div", { class: "readout" }, h("dt", null, "Labelled questions"), h("dd", null, num(n), h("span", { class: "readout-note" }, "Saved in this browser"))),
         h("div", { class: `readout${leaked ? " is-warn" : ""}` }, h("dt", null, "Flagged questions"), h("dd", null, num(leaked), h("span", { class: "readout-note" }, "Repeat a relevant record's title"))),
         h("div", { class: "readout" }, h("dt", null, "Records used as answers"), h("dd", null, num(records), h("span", { class: "readout-note" }, `Of ${num(items.length)} active records`))),
-        h("div", { class: "readout" }, h("dt", null, "Latest run"), h("dd", null, evalState.results ? fmtWhen(evalState.results.generated_at) : "None", h("span", { class: "readout-note" }, evalState.results ? `${(evalState.results.modes_run || []).length} modes, top ${evalState.results.k}` : "Run to see results")))),
+        h("div", { class: "readout" }, h("dt", null, "Latest run"), h("dd", null, evalState.results ? runTime(evalState.results.generated_at) : "None", h("span", { class: "readout-note" }, evalState.results ? `${runDay(evalState.results.generated_at)}, ${(evalState.results.modes_run || []).length} modes, top ${evalState.results.k}` : "Run to see results")))),
       results);
     if (evalState.results) drawResults();
     else put(results, empty("No evaluation run yet", "Label a few questions, then run the standard evaluation to see recall by mode with intervals."));
@@ -564,6 +572,7 @@ export async function viewEvaluation(params) {
 
   const detail = tabs([
     { id: "overview", label: "Overview", panel: overviewHost },
+    { id: "summary", label: "Summary for managers", panel: summaryHost },
     { id: "runs", label: "Runs", panel: runsHost },
     { id: "questions", label: `Questions and labels`, panel: questionsHost },
     { id: "failures", label: "Failure analysis", panel: failuresHost },
@@ -575,6 +584,7 @@ export async function viewEvaluation(params) {
   drawQuestions();
   drawFailures();
   drawRuns();
+  drawSummary();
   const want = evalState.pending ? "questions" : params?.get?.("tab");
-  if (want && ["overview", "runs", "questions", "failures", "advanced"].includes(want)) detail.select(want);
+  if (want && ["overview", "summary", "runs", "questions", "failures", "advanced"].includes(want)) detail.select(want);
 }

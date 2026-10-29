@@ -1190,3 +1190,29 @@ pre.cmd { white-space: pre-wrap; word-break: break-all; }
 .readout { border-left: 0; box-shadow: inset 1px 0 0 var(--line); }
 .row-actions { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
 .row-actions .btn-quiet { min-height: 0; padding: 2px 0; }
+
+/* ---------------------------------------------- evaluation summary (managers) */
+.summary-headline { font-size: 1.25rem; line-height: 1.45; font-weight: 600; max-width: 62ch; margin: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-3); }
+.kpi { border: 1px solid var(--line); border-radius: var(--radius-m, 8px); padding: var(--space-4); background: var(--surface); display: grid; gap: var(--space-2); align-content: start; }
+.kpi-label { font-size: .9rem; color: var(--ink-2, var(--ink)); }
+.kpi-value { font-size: 2.1rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.kpi-change { font-size: .85rem; color: var(--ink-2, var(--ink)); }
+.kpi-note { font-size: .85rem; margin: 0; color: var(--ink-2, var(--ink)); }
+.summary-charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.summary-fig .chart { max-width: 900px; }
+.summary-fig { margin: 0; border: 1px solid var(--line); border-radius: var(--radius-m, 8px); padding: var(--space-4); display: grid; gap: var(--space-3); }
+.summary-fig figcaption { display: grid; gap: 2px; }
+.summary-fig figcaption span { font-size: .85rem; color: var(--ink-2, var(--ink)); }
+.summary-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-5); }
+.summary-cols h3 { margin: 0 0 var(--space-2); font-size: 1rem; }
+.summary-list { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-2); }
+.summary.panel { display: grid; gap: var(--space-5); }
+.chart-line { fill: none; stroke: var(--series-1); stroke-width: 2.5; stroke-linejoin: round; }
+.chart-dot { fill: var(--series-1); stroke: var(--surface); stroke-width: 2; }
+.chart-break { stroke: var(--line-strong); stroke-dasharray: 4 4; }
+@media print {
+  .tab-list, .no-print, .page-head, .run-form { display: none !important; }
+  .summary-charts, .kpis { break-inside: avoid; }
+}

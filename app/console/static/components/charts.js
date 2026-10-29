@@ -142,3 +142,41 @@ export function heatStep(v) {
   if (v < 1) return 2;
   return 3;
 }
+
+/**
+ * Line over time on a 0..1 scale. points: [{ label, value, tip, breakBefore }].
+ * breakBefore marks a point measured on a different question set: the line is
+ * not drawn across it and a dashed marker says why, so a change of test is
+ * never read as a change in the system.
+ */
+export function lineTrend({ points, label, format }) {
+  const W = 720, left = 48, right = 24, top = 16, axisH = 34, H = 230;
+  const plotW = W - left - right, plotH = H - top - axisH;
+  const pad = 36; // keep the first and last value labels clear of the axis
+  const X = (i) => left + pad + (points.length === 1 ? (plotW - 2 * pad) / 2 : (i / (points.length - 1)) * (plotW - 2 * pad));
+  const Y = (v) => top + (1 - Math.max(0, Math.min(1, v))) * plotH;
+  const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": label });
+  for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+    svg.append(s("line", { class: t === 0 ? "chart-base" : "chart-grid", x1: left, x2: W - right, y1: Y(t), y2: Y(t) }));
+    svg.append(s("text", { class: "chart-tick", x: left - 8, y: Y(t) + 4, "text-anchor": "end" }, `${Math.round(t * 100)}%`));
+  }
+  let d = "";
+  points.forEach((p, i) => {
+    if (p.breakBefore && i) {
+      const xm = (X(i - 1) + X(i)) / 2;
+      svg.append(s("line", { class: "chart-break", x1: xm, x2: xm, y1: top, y2: top + plotH }));
+      svg.append(s("text", { class: "chart-tick", x: xm, y: top + 10, "text-anchor": "middle" }, "questions changed"));
+    }
+    if (typeof p.value !== "number") return;
+    d += `${!d || p.breakBefore ? "M" : "L"}${X(i)} ${Y(p.value)}`;
+  });
+  if (d) svg.append(s("path", { class: "chart-line", d }));
+  points.forEach((p, i) => {
+    svg.append(s("text", { class: "chart-tick", x: X(i), y: H - 12, "text-anchor": "middle" }, p.label));
+    if (typeof p.value !== "number") return;
+    svg.append(s("circle", { class: "chart-dot", cx: X(i), cy: Y(p.value), r: 5 }));
+    svg.append(s("text", { class: "chart-value", x: X(i), y: Y(p.value) - 10, "text-anchor": "middle" }, format(p.value)));
+    svg.append(s("circle", { class: "chart-hit", cx: X(i), cy: Y(p.value), r: 14, tabindex: "0", "data-tip": p.tip }));
+  });
+  return svg;
+}
