@@ -13,6 +13,13 @@ import re
 from typing import Iterable, Optional
 
 _CITATION = re.compile(r"\[Memory\s+(\d+)\]")
+# A citation written after the full stop ("...seal. [Memory 4]") belongs to the
+# sentence before it; move it inside so sentence splitting keeps them together.
+_TRAILING_CITATIONS = re.compile(r"([.!?]+)(\s*)((?:\[Memory\s+\d+\][\s,;]*)+)")
+
+
+def _attach_trailing_citations(answer: str) -> str:
+    return _TRAILING_CITATIONS.sub(lambda m: " " + m.group(3).strip() + m.group(1) + m.group(2), answer or "")
 
 
 def recall_at_k(retrieved_ids: list[str], expected_ids: Iterable[str], k: int = 10) -> float:
@@ -47,7 +54,7 @@ def groundedness_score(answer: str) -> float:
 
     Heuristic only; use human review or an LLM judge for real answer grading.
     """
-    sentences = [s.strip() for s in re.split(r"[.!?]+", answer or "") if len(s.strip()) > 30]
+    sentences = [s.strip() for s in re.split(r"[.!?]+", _attach_trailing_citations(answer)) if len(s.strip()) > 30]
     if not sentences:
         return 0.0
     return sum(1 for s in sentences if _CITATION.search(s)) / len(sentences)

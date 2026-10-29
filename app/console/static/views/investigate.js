@@ -155,7 +155,10 @@ export function renderInvestigation(d, anchor) {
       h("button", { class: "btn btn-primary", type: "button", disabled: !canRecord, onclick: () => findingForm(d, anchor) }, "Record finding"),
       incidentSlot,
       admin ? h("button", { class: "btn", type: "button", disabled: !canRecord, onclick: () => {
-        evalState.pending = { question: d.question, candidates: ev.map((e) => ({ id: e.memory_id, title: e.title })) };
+        // Hand over the question only; the Evaluation page pools candidates
+        // from every retrieval mode so labels aren't limited to what this
+        // investigation happened to find.
+        evalState.pending = { question: d.question, anchor: anchor || null, evidence: ev.map((e) => e.memory_id) };
         go("evaluation");
       } }, "Add to benchmark") : null,
       admin ? navLink("Compare search modes", "search", { q: d.question, mode: "hybrid" }, "btn") : null),

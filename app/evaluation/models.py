@@ -42,6 +42,8 @@ class EvalCase:
     description: str = ""
     asset_id: Optional[str] = None
     incident_id: Optional[str] = None
+    # Starting record for investigation-mode cases, as engineers run them.
+    anchor_memory_id: Optional[str] = None
 
 
 @dataclass

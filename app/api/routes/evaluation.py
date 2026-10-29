@@ -40,6 +40,9 @@ class EvalCaseIn(BaseModel):
     case_id: Optional[str] = None
     question: str = Field(..., min_length=1)
     expected_memory_ids: list[UUID] = Field(default_factory=list)
+    # Optional starting record; used by investigation mode only, so the case is
+    # measured the way engineers investigate (from a record).
+    anchor_memory_id: Optional[UUID] = None
 
 
 class EvalRunRequest(BaseModel):
@@ -72,15 +75,16 @@ def run_evaluation(
 
     workflow = AegisOpsWorkflow(GraphRAGPipeline(retriever=retriever, llm_provider=llm_provider, context_limit=request.k))
 
-    def retrieval_fn(question: str, mode: str):
+    def retrieval_fn(question: str, mode: str, anchor_memory_id: Optional[str] = None):
         if mode == "agentic":
-            trace, rag = workflow.run(question)
+            trace, rag = workflow.run(question, anchor_memory_id)
             return rag.answer, [e.memory_id for e in rag.evidence], rag.retrieval_latency_ms, rag.generation_latency_ms
         results = retriever.retrieve(RetrievalQuery(text=question, mode=mode, final_limit=request.k, semantic_limit=max(10, request.k)))
         return None, [str(r.memory_id) for r in results], 0.0, 0.0
 
     cases = [
-        EvalCase(case_id=c.case_id or f"q-{i + 1:03d}", question=c.question, expected_memory_ids=[str(m) for m in c.expected_memory_ids])
+        EvalCase(case_id=c.case_id or f"q-{i + 1:03d}", question=c.question, expected_memory_ids=[str(m) for m in c.expected_memory_ids],
+                 anchor_memory_id=str(c.anchor_memory_id) if c.anchor_memory_id else None)
         for i, c in enumerate(request.cases)
     ]
     run = EvaluationRunner(retrieval_fn=retrieval_fn, run_name="console").evaluate(

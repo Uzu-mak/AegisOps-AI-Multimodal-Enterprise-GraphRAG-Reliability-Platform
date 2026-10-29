@@ -1,83 +1,76 @@
-import { busy, empty, fmtWhen, notice, num, pageHead, pct, scoreBar, shortId, skeleton, toast } from "../components/ui.js";
-import { groupedBars, heatStep, legend, logBars, withTooltip } from "../components/charts.js";
+import { busy, empty, fmtWhen, notice, num, pageHead, pct, scoreBar, shortId, skeleton, stateChip, toast, typeLabel } from "../components/ui.js";
+import { dotWhisker, heatStep, logBars, withTooltip } from "../components/charts.js";
+import { tabs } from "../components/tabs.js";
+import { showMemory } from "../components/records.js";
+import { bootstrapMean, evidenceStrength, leakage, shuffled } from "../lib/evalmath.js";
 import { api, fetchAllMemories } from "../lib/api.js";
 import { h, put, s } from "../lib/dom.js";
-import { evalState, href, main, navLink, saveEvalCases } from "../lib/state.js";
+import { evalState, href, main, navLink, saveEvalCases, state } from "../lib/state.js";
 
 /* -------------------------------------------------------- evaluation */
 
-export const MODE_LABEL = { semantic: "Meaning", graph: "Relationships", hybrid: "Both", agentic: "Investigation" };
+// Evaluation opens on a reliability overview, not a form. Labelling is an
+// assisted review of pooled candidates; the standard profile runs every mode
+// at top 10; mode and k overrides, the CLI command and raw downloads sit under
+// Advanced. Everything here is exploratory: questions live in this browser
+// and aren't reviewed or versioned (see the Evaluation Control Center design).
 
-export async function viewEvaluation() {
-  const head = pageHead("Evaluation", "Measure whether retrieval finds the records a correct answer needs. Runs use the same retrieval and metrics as the recorded CLI benchmark.");
+export const MODE_LABEL = { semantic: "Meaning", graph: "Relationships", hybrid: "Both", agentic: "Investigation" };
+const STANDARD = { modes: ["semantic", "graph", "hybrid", "agentic"], k: 10 };
+const RUN_KEY = "aegis-eval-last-run";
+const SECONDS_PER_INVESTIGATION = 3; // measured ~2.7 s per question on 29 Oct 2026
+
+function loadLastRun() {
+  try { return JSON.parse(localStorage.getItem(RUN_KEY) || "null"); } catch { return null; }
+}
+function saveLastRun(run) {
+  try { localStorage.setItem(RUN_KEY, JSON.stringify(run)); } catch {}
+}
+
+export async function viewEvaluation(params) {
+  const head = pageHead("Evaluation", "Is retrieval finding the records a correct answer needs, and how sure can we be?");
   put(main, head, skeleton());
   const all = await fetchAllMemories({ status: "active" });
   const items = all.items || [];
-  const titleOf = (id) => items.find((m) => m.id === id)?.title || `record ${shortId(id)}`;
+  const byId = new Map(items.map((m) => [m.id, m]));
+  const titleOf = (id) => byId.get(id)?.title || `record ${shortId(id)}`;
+  // Older saved questions have no leak flag; work it out from their labels.
+  const leakedCase = (c) => (typeof c.leaked === "boolean" ? c.leaked : leakage(c.question, c.expected.map(titleOf)).leaked);
+  if (!evalState.results) evalState.results = loadLastRun();
 
-  const caseList = h("div", { class: "stack" });
   const results = h("div", { class: "stack", "aria-live": "polite" });
-  const q = h("input", { type: "text", id: "e-q", placeholder: "e.g. What fixed the oversize holes on drill cell DC-3?" });
-  const expected = h("select", { id: "e-exp", multiple: true, size: 6 }, items.map((m) => h("option", { value: m.id }, m.title)));
-
-  const drawCases = () => {
-    put(caseList, evalState.cases.length
-      ? h("div", { class: "table-wrap" }, h("table", null,
-          h("caption", null, `${evalState.cases.length} benchmark question${evalState.cases.length === 1 ? "" : "s"}, saved in this browser`),
-          h("thead", null, h("tr", null, h("th", { scope: "col" }, "Question"), h("th", { scope: "col" }, "Records a correct answer must use"), h("th", { scope: "col" }, h("span", { class: "visually-hidden" }, "Actions")))),
-          h("tbody", null, evalState.cases.map((c, i) => h("tr", null,
-            h("td", null, c.question),
-            h("td", null, c.expected.map(titleOf).join("; ") || "—"),
-            h("td", { class: "num" }, h("button", { class: "btn btn-quiet", type: "button", onclick: () => { evalState.cases.splice(i, 1); saveEvalCases(); drawCases(); } }, "Remove")))))))
-      : empty("No benchmark questions", "Add a question and pick the records a good answer must retrieve, or use Add to benchmark from an investigation."));
-  };
-
-  const pendingPanel = () => {
-    const p = evalState.pending;
-    if (!p) return null;
-    const boxes = p.candidates.map((c) => h("label", { class: "check" }, h("input", { type: "checkbox", value: c.id }), c.title));
-    const panel = h("section", { class: "panel", "aria-labelledby": "pend-title" },
-      h("div", { class: "panel-head" }, h("h2", { id: "pend-title" }, "Label a question from your investigation")),
-      h("p", { class: "toolbar-note" }, `“${p.question}”. Tick only the records a correct answer must use. These labels are your judgement, so nothing is ticked for you.`),
-      h("div", { class: "check-list" }, boxes),
-      h("div", { class: "page-actions" },
-        h("button", { class: "btn btn-primary", type: "button", onclick: () => {
-          const ids = boxes.map((b) => b.querySelector("input")).filter((i) => i.checked).map((i) => i.value);
-          if (!ids.length) return toast("Tick at least one record, or discard the question", true);
-          evalState.cases.push({ question: p.question, expected: ids });
-          evalState.pending = null; saveEvalCases(); panel.remove(); drawCases();
-          toast("Question added to the benchmark");
-        } }, "Add labelled question"),
-        h("button", { class: "btn", type: "button", onclick: () => { evalState.pending = null; panel.remove(); } }, "Discard")));
-    return panel;
-  };
-
-  const kSel = h("select", { id: "e-k" }, [5, 10, 20].map((n) => h("option", { value: n, selected: n === 10 }, String(n))));
-  const modeBoxes = h("fieldset", null, h("legend", null, "Compare"),
-    h("div", { class: "toolbar" }, Object.entries(MODE_LABEL).map(([v, l]) =>
-      h("label", { class: "check" }, h("input", { type: "checkbox", name: "emode", value: v, checked: v !== "agentic" }), l))));
-  const run = h("button", { class: "btn btn-primary", type: "button" }, "Run benchmark");
-
-  run.addEventListener("click", async () => {
-    if (!evalState.cases.length) return toast("Add at least one question first", true);
-    const modes = [...modeBoxes.querySelectorAll("input:checked")].map((i) => i.value);
-    if (!modes.length) return toast("Choose at least one mode", true);
-    busy(run, true);
-    put(results, h("div", { class: "panel" }, h("p", null, "Running benchmark"), skeleton()));
-    const r = await api("/evaluation/runs", { method: "POST", timeout: 120000, body: {
-      cases: evalState.cases.map((c, i) => ({ case_id: `q-${String(i + 1).padStart(3, "0")}`, question: c.question, expected_memory_ids: c.expected })),
-      modes, k: Number(kSel.value) } });
-    busy(run, false);
-    if (!r.ok) return put(results, notice("crit", "The benchmark didn't run", r.error));
-    evalState.results = r.data;
-    drawResults();
-    results.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  });
+  const overviewHost = h("div", { class: "stack" });
+  const questionsHost = h("div", { class: "stack" });
+  const failuresHost = h("div", { class: "stack" });
 
   const download = (name, text, type) => {
     const a = h("a", { href: URL.createObjectURL(new Blob([text], { type })), download: name });
     document.body.append(a); a.click(); a.remove();
   };
+
+  /* ---------------------------------------------------------- running */
+
+  const runEvaluation = async (button, { modes, k }) => {
+    if (!evalState.cases.length) return toast("Add at least one labelled question first", true);
+    let use = modes;
+    const slow = use.includes("agentic") && evalState.cases.length * SECONDS_PER_INVESTIGATION > 100;
+    if (slow) use = use.filter((m) => m !== "agentic");
+    busy(button, true);
+    put(results, h("div", { class: "panel" }, h("p", null, `Running ${evalState.cases.length} question${evalState.cases.length === 1 ? "" : "s"} through ${use.map((m) => MODE_LABEL[m]).join(", ")}`), skeleton()));
+    detail.select("overview");
+    const r = await api("/evaluation/runs", { method: "POST", timeout: 120000, body: {
+      cases: evalState.cases.map((c, i) => ({ case_id: `q-${String(i + 1).padStart(3, "0")}`, question: c.question, expected_memory_ids: c.expected, anchor_memory_id: c.anchor || null })),
+      modes: use, k } });
+    busy(button, false);
+    if (!r.ok) return put(results, notice("crit", "The evaluation didn't run", r.error));
+    evalState.results = r.data;
+    saveLastRun(r.data);
+    drawOverview();
+    drawFailures();
+    if (slow) toast("Investigation mode was left out: this many questions would pass the 2-minute limit. Run it from Advanced with fewer questions.", true);
+  };
+
+  /* ------------------------------------------------- latest run (charts) */
 
   const drawResults = () => {
     const res = evalState.results;
@@ -93,26 +86,36 @@ export async function viewEvaluation() {
     const best = modesRun.filter((m) => measured(m, "recall_at_k"))
       .sort((a, b) => pm[b].recall_at_k - pm[a].recall_at_k || (pm[b].mrr ?? 0) - (pm[a].mrr ?? 0)).at(0);
     const fastest = modesRun.filter((m) => measured(m, "latency_p50_ms")).sort((a, b) => pm[a].latency_p50_ms - pm[b].latency_p50_ms).at(0);
+    // "groundedness" in the API is the share of answer sentences that carry a
+    // citation; it is shown as citation coverage, which is what it measures.
     const grounded = pm.agentic?.groundedness;
 
     const tile = (label, value, note, sev) => h("div", { class: `readout${sev ? ` is-${sev}` : ""}` },
       h("dt", null, label), h("dd", null, value, h("span", { class: "readout-note" }, note)));
 
-    const metricSeries = [
-      { key: "recall_at_5", label: "Recall at 5", cls: "is-s1" },
-      { key: "recall_at_k", label: `Recall at ${k}`, cls: "is-s2" },
-      { key: "mrr", label: `MRR at ${k}`, cls: "is-s3" },
-    ];
+    // Per-mode means with 95% bootstrap intervals over questions.
+    const perCase = (m, key) => (res.cases || []).filter((c) => c.mode === m && c.labeled !== false && !c.error).map((c) => c[key]);
+    const ci = Object.fromEntries(modesRun.map((m) => [m, {
+      recall5: bootstrapMean(perCase(m, "recall_at_5")),
+      recall: bootstrapMean(perCase(m, "recall_at_k")),
+      mrr: bootstrapMean(perCase(m, "mrr")),
+    }]));
+    const range = (c) => (!c ? "—" : c.lo === null ? `${pct(c.mean)}, no interval` : `${pct(c.mean)} (${pct(c.lo)} to ${pct(c.hi)})`);
+    const caseFor = (q) => evalState.cases.find((c) => c.question === q);
+    const leakedQs = questions.filter((q) => { const c = caseFor(q); return c ? leakedCase(c) : false; }).length;
+    const strength = evidenceStrength({ n, semantic, source: "console", leaked: leakedQs });
+
     const metricChart = h("section", { class: "panel viz", "aria-labelledby": "ev-metrics" },
       h("div", { class: "panel-head" }, h("div", null,
-        h("h2", { id: "ev-metrics" }, "Does each mode find the records a correct answer needs?"),
-        h("p", null, "Recall: share of the labelled records found in the top results. MRR: how high the first one ranks (100% means first place)."))),
-      legend(metricSeries),
-      withTooltip(h("div", { class: "chart-wrap" }, groupedBars({
-        rows: modesRun.map((m) => ({ label: MODE_LABEL[m], values: Object.fromEntries(metricSeries.map((sr) => [sr.key, pm[m]?.[sr.key] ?? null])) })),
-        series: metricSeries,
-        format: (v) => `${Math.round(v * 100)}%`,
-        label: `Recall at 5, recall at ${k} and MRR at ${k} for each retrieval mode`,
+        h("h2", { id: "ev-metrics" }, `Recall at ${k}, with how sure we are`),
+        h("p", null, `Dot: share of labelled records found in the top ${k}, averaged over questions. Line: 95% interval from resampling the questions; a wide line means too few questions to tell modes apart.`))),
+      withTooltip(h("div", { class: "chart-wrap" }, dotWhisker({
+        rows: modesRun.map((m) => {
+          const c = ci[m].recall;
+          return { label: MODE_LABEL[m], mean: c?.mean, lo: c?.lo, hi: c?.hi, cls: m === best ? "is-s1" : "is-quiet",
+            text: !c ? "not measured" : c.lo === null ? `${pct(c.mean)}, 1 question` : `${pct(c.mean)}  (${pct(c.lo)}–${pct(c.hi)})` };
+        }),
+        label: `Recall at ${k} for each retrieval mode with 95% bootstrap intervals`,
       }))));
 
     const latencyChart = h("section", { class: "panel viz", "aria-labelledby": "ev-latency" },
@@ -136,7 +139,7 @@ export async function viewEvaluation() {
         h("caption", { class: "visually-hidden" }, `Recall at ${k} by question and mode`),
         h("thead", null, h("tr", null, h("th", { scope: "col" }, "Question"), modesRun.map((m) => h("th", { scope: "col", class: "num" }, MODE_LABEL[m])))),
         h("tbody", null, questions.map((q) => h("tr", null,
-          h("th", { scope: "row" }, q),
+          h("th", { scope: "row" }, q, caseFor(q) && leakedCase(caseFor(q)) ? h("span", { class: "row-tags" }, h("span", { class: "tag tag-warn" }, "Repeats a record title")) : null),
           modesRun.map((m) => {
             const c = caseOf(q, m);
             if (!c) return h("td", { class: "heat-cell" }, "—");
@@ -153,14 +156,14 @@ export async function viewEvaluation() {
       h("summary", null, "Show the numbers as tables"),
       h("div", { class: "table-wrap" }, h("table", null,
         h("caption", null, `Mean over ${n} labelled question${n === 1 ? "" : "s"}`),
-        h("thead", null, h("tr", null, ["Mode", "Recall at 5", `Recall at ${k}`, `MRR at ${k}`, "Cited sentences", "Latency p50"].map((c, i) => h("th", { scope: "col", class: i ? "num" : null }, c)))),
+        h("thead", null, h("tr", null, ["Mode", "Recall at 5 (95% interval)", `Recall at ${k} (95% interval)`, `MRR at ${k} (95% interval)`, "Citation coverage", "Latency p50"].map((c, i) => h("th", { scope: "col", class: i ? "num" : null }, c)))),
         h("tbody", null, modesRun.map((m) => {
           const v = pm[m] || {};
           return h("tr", null,
             h("th", { scope: "row" }, MODE_LABEL[m]),
-            h("td", { class: "num" }, v.recall_at_5 === null || v.recall_at_5 === undefined ? "—" : pct(v.recall_at_5)),
-            h("td", { class: "num" }, v.recall_at_k === null || v.recall_at_k === undefined ? "—" : pct(v.recall_at_k)),
-            h("td", { class: "num" }, v.mrr === null || v.mrr === undefined ? "—" : pct(v.mrr)),
+            h("td", { class: "num" }, range(ci[m].recall5)),
+            h("td", { class: "num" }, range(ci[m].recall)),
+            h("td", { class: "num" }, range(ci[m].mrr)),
             h("td", { class: "num" }, v.groundedness === null || v.groundedness === undefined ? "Not applicable" : pct(v.groundedness)),
             h("td", { class: "num" }, `${num(v.latency_p50_ms, 0)} ms`));
         })))));
@@ -168,62 +171,294 @@ export async function viewEvaluation() {
     put(results,
       h("div", { class: "run-head" },
         h("h2", null, "Latest run"),
-        h("p", { class: "toolbar-note" }, `Run ${shortId(res.run_id)}, ${fmtWhen(res.generated_at)}. ${n} labelled question${n === 1 ? "" : "s"}, top ${k}, embedding ${res.embedding_model}.`),
-        h("button", { class: "btn", type: "button", onclick: () => download(`aegisops-run-${res.run_id}.json`, JSON.stringify({ cases: evalState.cases, ...res }, null, 2), "application/json") }, "Download run (JSON)")),
+        h("p", { class: "toolbar-note" }, `${fmtWhen(res.generated_at)}, run in this browser, ${n} question${n === 1 ? "" : "s"}.`)),
       !semantic ? notice("warn", "Vector scores come from a test embedding",
         "The API is running a non-semantic embedding, so Meaning, Relationships and Both rank records by hashed text, not by meaning. Set EMBEDDING_PROVIDER=openai, re-project, and run again before quoting these numbers.",
         [navLink("Open System health", "system", {}, "btn")]) : null,
+      // With few records, the top k can hold most of them, so recall at k is
+      // close to guaranteed; recall at 5 and MRR still discriminate.
+      items.length && k >= items.length / 2 ? notice("warn", `Top ${k} covers ${k} of ${items.length} active records`,
+        `Recall at ${k} is nearly guaranteed on a collection this small. Read Recall at 5 and MRR (how high the answer ranks) instead, or import the plant's work-order history for a meaningful test.`,
+        [navLink("Import work orders", "import", {}, "btn")]) : null,
       unavailable.length ? notice("warn", "Some modes didn't run", unavailable.map(([m, why]) => `${MODE_LABEL[m]}: ${why}.`).join(" ") + " They are reported as not measured, not as zero.", [navLink("Open System health", "system", {}, "btn")]) : null,
-      n && n < 20 ? notice("info", `Small sample: ${n} question${n === 1 ? "" : "s"}`,
-        `Each question moves recall by about ${Math.round(100 / n)} percentage points. Label more questions before comparing modes or quoting results.`) : null,
       h("dl", { class: "readouts" },
-        tile("Labelled questions", num(n), `Scored at top ${k}`),
-        tile("Best recall", best ? pct(pm[best].recall_at_k) : "—", best ? `${MODE_LABEL[best]}, recall at ${k}` : "No mode measured"),
-        tile("Cited sentences", typeof grounded === "number" ? pct(grounded) : "—", typeof grounded === "number" ? "Investigation answers with a citation per sentence" : "Investigation mode not run"),
+        tile("Evidence strength", strength.label, `${strength.why.join("; ")}. Use for: ${strength.level === "exploratory" ? "debugging only" : strength.level === "indicative" ? "internal comparison" : "gates and reports"}.`, strength.level === "exploratory" ? "warn" : null),
+        tile("Labelled questions", num(n), `Scored at top ${k}${n ? `; one question moves recall ${Math.round(100 / n)} points` : ""}`),
+        tile(`Recall at ${k}, best mode`, best && ci[best].recall ? pct(ci[best].recall.mean) : "—",
+          !best ? "No mode measured" : ci[best].recall?.lo === null ? `${MODE_LABEL[best]}; one question, so no interval` : `${MODE_LABEL[best]}; 95% interval ${pct(ci[best].recall.lo)} to ${pct(ci[best].recall.hi)}`),
+        tile("Citation coverage", typeof grounded === "number" ? pct(grounded) : "—", typeof grounded === "number" ? "Investigation answer sentences carrying a citation; not a check that they're true" : "Investigation mode not run"),
         tile("Fastest median", fastest ? `${num(pm[fastest].latency_p50_ms, 0)} ms` : "—", fastest ? MODE_LABEL[fastest] : "No timing measured")),
       h("div", { class: "grid grid-2 viz-grid" }, metricChart, latencyChart),
       heat,
       tables,
+      h("details", { class: "panel raw" },
+        h("summary", null, "Run details"),
+        h("dl", { class: "facts" },
+          [["Run", shortId(res.run_id)], ["Started", fmtWhen(res.generated_at)], ["Modes", modesRun.map((m) => MODE_LABEL[m]).join(", ")],
+           ["Top k", String(k)], ["Embedding", res.embedding_model], ["Questions", String(n)]].map(([t, v]) => [h("dt", null, t), h("dd", null, v)])),
+        h("div", { class: "page-actions" },
+          h("button", { class: "btn", type: "button", onclick: () => download(`aegisops-run-${res.run_id}.json`, JSON.stringify({ cases: evalState.cases, ...res }, null, 2), "application/json") }, "Download run (JSON)"))),
     );
   };
 
+
+  /* ---------------------------------------------------------- overview */
+
+  const drawOverview = () => {
+    const cases = evalState.cases;
+    const n = cases.length;
+    const leaked = cases.filter(leakedCase).length;
+    const emb = state.health?.embedding_provider;
+    const semantic = emb ? emb.semantic !== false : true;
+    const strength = evidenceStrength({ n, semantic, source: "console", leaked });
+    const records = new Set(cases.flatMap((c) => c.expected)).size;
+    const runBtn = h("button", { class: "btn", type: "button", disabled: !n, onclick: (e) => runEvaluation(e.currentTarget, STANDARD) }, "Run standard evaluation");
+
+    let action;
+    if (!semantic) {
+      action = { title: "Switch to a semantic embedding first", body: `The API is using ${emb?.name || "a test embedding"}, so Meaning, Relationships and Both rank records by hashed text. Set EMBEDDING_PROVIDER=openai in .env, rebuild, and re-project before trusting any score.`, button: navLink("Open System health", "system", {}, "btn btn-primary") };
+    } else if (!n) {
+      action = { title: "Label your first question", body: "Write a question the way an engineer would ask it, then tick the records a correct answer needs from pooled candidates.", button: h("button", { class: "btn btn-primary", type: "button", onclick: () => detail.select("questions") }, "Add a question") };
+    } else if (leaked) {
+      action = { title: `Rephrase ${leaked} flagged question${leaked === 1 ? "" : "s"}`, body: "They repeat a relevant record's title, so they test string matching, not retrieval.", button: h("button", { class: "btn btn-primary", type: "button", onclick: () => detail.select("questions") }, "Review questions") };
+    } else if (n < 10) {
+      action = { title: `Label ${10 - n} more question${10 - n === 1 ? "" : "s"}`, body: "Ten is the minimum for an indicative comparison of modes; thirty human-reviewed questions are needed for a decision.", button: h("button", { class: "btn btn-primary", type: "button", onclick: () => detail.select("questions") }, "Add questions") };
+    } else {
+      action = { title: "Run the standard evaluation", body: "All four modes at top 10 on your current questions.", button: h("button", { class: "btn btn-primary", type: "button", onclick: (e) => runEvaluation(e.currentTarget, STANDARD) }, "Run standard evaluation") };
+    }
+
+    put(overviewHost,
+      h("section", { class: `panel readiness is-${strength.level}`, "aria-labelledby": "ready-title" },
+        h("div", { class: "readiness-main" },
+          h("p", { class: "prov-label" }, "Evidence strength of your current questions"),
+          h("h2", { id: "ready-title" }, stateChip(strength.label, strength.sev)),
+          h("ul", { class: "readiness-why" }, strength.why.map((w) => h("li", null, w.charAt(0).toUpperCase() + w.slice(1)))),
+          h("p", { class: "toolbar-note" }, strength.level === "exploratory" ? "Good for debugging; not for comparing modes or reporting." : strength.level === "indicative" ? "Good for comparing modes internally, with intervals." : "Good for release decisions.")),
+        h("div", { class: "readiness-next" },
+          h("p", { class: "prov-label" }, "Recommended next action"),
+          h("h3", null, action.title),
+          h("p", null, action.body),
+          h("div", { class: "page-actions" }, action.button, action.button.textContent === "Run standard evaluation" ? null : runBtn),
+          h("p", { class: "cell-sub" }, "Standard profile: Meaning, Relationships, Both and Investigation at top 10. Change it under Advanced."))),
+      h("dl", { class: "readouts" },
+        h("div", { class: "readout" }, h("dt", null, "Labelled questions"), h("dd", null, num(n), h("span", { class: "readout-note" }, "Saved in this browser"))),
+        h("div", { class: `readout${leaked ? " is-warn" : ""}` }, h("dt", null, "Flagged questions"), h("dd", null, num(leaked), h("span", { class: "readout-note" }, "Repeat a relevant record's title"))),
+        h("div", { class: "readout" }, h("dt", null, "Records used as answers"), h("dd", null, num(records), h("span", { class: "readout-note" }, `Of ${num(items.length)} active records`))),
+        h("div", { class: "readout" }, h("dt", null, "Latest run"), h("dd", null, evalState.results ? fmtWhen(evalState.results.generated_at) : "None", h("span", { class: "readout-note" }, evalState.results ? `${(evalState.results.modes_run || []).length} modes, top ${evalState.results.k}` : "Run to see results")))),
+      results);
+    if (evalState.results) drawResults();
+    else put(results, empty("No evaluation run yet", "Label a few questions, then run the standard evaluation to see recall by mode with intervals."));
+  };
+
+  /* ------------------------------------------------ assisted labelling */
+
+  // Candidates are pooled from all three retrieval modes, the starting
+  // record's incident and asset, any evidence passed in and three random
+  // records, then shuffled and shown without saying which mode found them, so
+  // the labels don't inherit the system's blind spots.
+  const candidatePicker = ({ question, anchor = null, evidence = [] }) => {
+    const list = h("div", { class: "check-list candidate-list" }, skeleton());
+    const leakNote = h("div");
+    const chosen = new Set();
+    const shown = new Set();
+    const row = (m) => {
+      shown.add(m.id);
+      return h("label", { class: "check candidate" },
+        h("input", { type: "checkbox", value: m.id, onchange: (e) => { if (e.target.checked) chosen.add(m.id); else chosen.delete(m.id); checkLeak(); } }),
+        h("span", null, h("strong", null, m.title), h("span", { class: "cell-sub" }, `${typeLabel(m.memory_type)}${m.asset_id ? ` · ${m.asset_id}` : ""} · ${m.content.length > 150 ? `${m.content.slice(0, 150)}…` : m.content}`)));
+    };
+    const checkLeak = () => {
+      const v = leakage(question, [...chosen].map(titleOf));
+      put(leakNote, v.leaked ? notice("warn", "This question gives away its answer", `${v.reason}. Rephrase it the way an engineer would ask; otherwise it is kept but flagged and can't count as evidence.`) : null);
+    };
+    const searchAll = h("input", { type: "search", "aria-label": "Search all records", placeholder: "Not listed? Search all records by title" });
+    const extra = h("div", { class: "check-list" });
+    searchAll.addEventListener("input", () => {
+      const f = searchAll.value.trim().toLowerCase();
+      put(extra, f.length < 3 ? null : items.filter((m) => !shown.has(m.id) && m.title.toLowerCase().includes(f)).slice(0, 8).map(row));
+    });
+    (async () => {
+      const pool = new Set(evidence);
+      const modes = await Promise.all(["semantic", "graph", "hybrid"].map((mode) => api("/search/hybrid", { method: "POST", body: { query: question, mode, limit: 10 } })));
+      for (const r of modes) if (r.ok) for (const x of r.data.results || []) pool.add(x.memory_id);
+      const a = anchor ? byId.get(anchor) : null;
+      if (a) for (const m of items) if ((a.incident_id && m.incident_id === a.incident_id) || (a.asset_id && m.asset_id === a.asset_id)) pool.add(m.id);
+      for (const m of shuffled(items.filter((m) => !pool.has(m.id))).slice(0, 3)) pool.add(m.id);
+      const cands = shuffled([...pool].map((id) => byId.get(id)).filter(Boolean));
+      put(list, cands.length ? cands.map(row) : h("p", { class: "toolbar-note" }, "No candidate records found."));
+    })();
+    return {
+      el: h("div", { class: "stack picker" },
+        h("p", { class: "toolbar-note" }, "Tick only the records a correct answer must use. Candidates come from every search mode, the same incident and asset, and a few random records, in random order; nothing is ticked for you."),
+        list, h("div", { class: "field" }, searchAll), extra, leakNote),
+      chosen: () => [...chosen],
+    };
+  };
+
+  const addCase = ({ question, ids, anchor = null }) => {
+    const v = leakage(question, ids.map(titleOf));
+    evalState.cases.push({ question, expected: ids, anchor, leaked: v.leaked, label_method: "console", added_at: new Date().toISOString() });
+    saveEvalCases();
+    toast(v.leaked ? "Question added, flagged as repeating a record title" : "Question added");
+    drawQuestions();
+    drawOverview();
+  };
+
+  /* --------------------------------------------------------- questions */
+
+  const drawQuestions = () => {
+    const p = evalState.pending;
+    let pendingEl = null;
+    if (p) {
+      const picker = candidatePicker({ question: p.question, anchor: p.anchor, evidence: p.evidence || [] });
+      pendingEl = h("section", { class: "panel", "aria-labelledby": "pend-title" },
+        h("div", { class: "panel-head" }, h("h2", { id: "pend-title" }, "Label the question from your investigation")),
+        h("p", { class: "inv-question" }, `“${p.question}”`),
+        picker.el,
+        h("div", { class: "page-actions" },
+          h("button", { class: "btn btn-primary", type: "button", onclick: () => {
+            const ids = picker.chosen();
+            if (!ids.length) return toast("Tick at least one record, or discard the question", true);
+            evalState.pending = null;
+            addCase({ question: p.question, ids, anchor: p.anchor || null });
+          } }, "Add labelled question"),
+          h("button", { class: "btn", type: "button", onclick: () => { evalState.pending = null; drawQuestions(); } }, "Discard")));
+    }
+
+    const qInput = h("input", { type: "text", id: "e-q", autocomplete: "off", spellcheck: "true", placeholder: "e.g. Why are panels from the autoclave coming out porous?" });
+    const qHint = h("p", { class: "field-hint", "aria-live": "polite" });
+    qInput.addEventListener("input", () => {
+      const v = /^\s*what do we know about:/i.test(qInput.value) ? leakage(qInput.value, []) : { leaked: false };
+      put(qHint, v.leaked ? h("span", { class: "tag tag-warn" }, "This is the console's generated wording; write the question an engineer would ask") : null);
+    });
+    const pickerHost = h("div");
+    let picker = null;
+    const findBtn = h("button", { class: "btn btn-primary", type: "button", onclick: () => {
+      const question = qInput.value.trim();
+      if (!question) { qInput.setAttribute("aria-invalid", "true"); return qInput.focus(); }
+      qInput.removeAttribute("aria-invalid");
+      picker = candidatePicker({ question });
+      put(pickerHost, picker.el, h("div", { class: "page-actions" },
+        h("button", { class: "btn btn-primary", type: "button", onclick: () => {
+          const ids = picker.chosen();
+          if (!ids.length) return toast("Tick at least one record a correct answer needs", true);
+          addCase({ question, ids });
+        } }, "Add labelled question"),
+        h("button", { class: "btn", type: "button", onclick: () => { put(pickerHost); picker = null; } }, "Cancel")));
+    } }, "Find candidate records");
+
+    const list = evalState.cases.length
+      ? h("div", { class: "table-wrap" }, h("table", null,
+          h("caption", null, `${evalState.cases.length} labelled question${evalState.cases.length === 1 ? "" : "s"}, saved in this browser and not yet reviewed`),
+          h("thead", null, h("tr", null, h("th", { scope: "col" }, "Question"), h("th", { scope: "col" }, "Records a correct answer needs"), h("th", { scope: "col" }, h("span", { class: "visually-hidden" }, "Actions")))),
+          h("tbody", null, evalState.cases.map((c, i) => h("tr", null,
+            h("td", null, c.question, leakedCase(c) ? h("span", { class: "row-tags" }, h("span", { class: "tag tag-warn" }, "Repeats a record title")) : null),
+            h("td", null, h("ul", { class: "plain-list" }, c.expected.map((id) => h("li", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(id) }, titleOf(id)))))),
+            h("td", { class: "num" }, h("button", { class: "btn btn-quiet", type: "button", onclick: () => { evalState.cases.splice(i, 1); saveEvalCases(); drawQuestions(); drawOverview(); } }, "Remove")))))))
+      : empty("No labelled questions yet", "Add one above, or use Add to benchmark from an investigation.");
+
+    put(questionsHost,
+      pendingEl,
+      h("section", { class: "panel", "aria-labelledby": "add-title" },
+        h("div", { class: "panel-head" }, h("div", null, h("h2", { id: "add-title" }, "Add a question"),
+          h("p", null, "Ask it the way an engineer would, without copying a record's title. AegisOps then pools candidate records for you to judge."))),
+        h("div", { class: "toolbar" }, h("div", { class: "field field-grow" }, h("label", { for: "e-q" }, "Question"), qInput), findBtn),
+        qHint, pickerHost),
+      list,
+      notice("info", "Questions are saved in this browser only", "They aren't shared with other people or devices, and clearing site data removes them. Export them under Advanced to keep them with the project."));
+  };
+
+  /* -------------------------------------------------- failure analysis */
+
+  // Factual diagnosis from this run alone: whether the expected record is
+  // still active, and whether another mode found it. Projection checks
+  // (is it in Qdrant or Neo4j?) need the server and come later.
+  const drawFailures = () => {
+    const res = evalState.results;
+    if (!res) return put(failuresHost, empty("No run to analyse", "Run an evaluation first; misses appear here with what is known about each."));
+    const k = res.k;
+    const cases = (res.cases || []).filter((c) => c.labeled !== false);
+    const expectedOf = (q) => evalState.cases.find((c) => c.question === q)?.expected || [];
+    const foundBy = (q, id) => cases.filter((c) => c.question === q && (c.retrieved_memory_ids || []).slice(0, k).includes(id)).map((c) => MODE_LABEL[c.mode]);
+    const misses = cases.filter((c) => c.error || c.recall_at_k < 1).map((c) => {
+      const exp = expectedOf(c.question);
+      const missing = exp.filter((id) => !(c.retrieved_memory_ids || []).slice(0, k).includes(id));
+      let diagnosis;
+      if (c.error) diagnosis = ["Run error", c.error];
+      else if (missing.some((id) => !byId.has(id))) diagnosis = ["Label is stale", "An expected record is no longer active"];
+      else {
+        const others = [...new Set(missing.flatMap((id) => foundBy(c.question, id)))];
+        diagnosis = others.length ? ["Another mode found it", `Found by ${others.join(", ")}`] : ["No mode found it", `Not in any mode's top ${k}`];
+      }
+      return { c, missing, diagnosis, first: (c.retrieved_memory_ids || [])[0] };
+    });
+    const counts = {};
+    for (const m of misses) counts[m.diagnosis[0]] = (counts[m.diagnosis[0]] || 0) + 1;
+    put(failuresHost,
+      h("dl", { class: "readouts" }, ["No mode found it", "Another mode found it", "Label is stale", "Run error"].map((d) =>
+        h("div", { class: `readout${counts[d] ? " is-warn" : ""}` }, h("dt", null, d), h("dd", null, num(counts[d] || 0), h("span", { class: "readout-note" }, "question × mode misses"))))),
+      misses.length
+        ? h("div", { class: "table-wrap" }, h("table", null,
+            h("caption", null, `${misses.length} miss${misses.length === 1 ? "" : "es"} in the latest run (top ${k}). Not yet checked: whether the missing record is projected into Qdrant and Neo4j.`),
+            h("thead", null, h("tr", null, ["Question", "Mode", "What we know", "Missing record", "Ranked first instead", ""].map((c) => h("th", { scope: "col" }, c)))),
+            h("tbody", null, misses.map(({ c, missing, diagnosis, first }) => h("tr", null,
+              h("td", null, c.question),
+              h("td", null, MODE_LABEL[c.mode]),
+              h("td", null, h("strong", null, diagnosis[0]), h("span", { class: "cell-sub" }, diagnosis[1])),
+              h("td", null, h("ul", { class: "plain-list" }, missing.map((id) => h("li", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(id) }, titleOf(id)))))),
+              h("td", null, first ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(first) }, titleOf(first)) : "Nothing returned"),
+              h("td", null, c.mode === "agentic" ? navLink("Investigate", "investigate", { q: c.question }) : navLink("Search", "search", { q: c.question, mode: c.mode })))))))
+        : empty("No misses", "Every labelled record was found by every mode in the latest run."));
+  };
+
+  /* ---------------------------------------------------------- advanced */
+
+  const kSel = h("select", { id: "e-k" }, [5, 10, 20].map((n) => h("option", { value: n, selected: n === 10 }, String(n))));
+  const modeBoxes = h("fieldset", null, h("legend", null, "Modes"),
+    h("div", { class: "toolbar" }, Object.entries(MODE_LABEL).map(([v, l]) =>
+      h("label", { class: "check" }, h("input", { type: "checkbox", name: "emode", value: v, checked: true }), l))));
+  const customRun = h("button", { class: "btn", type: "button", onclick: () => {
+    const modes = [...modeBoxes.querySelectorAll("input:checked")].map((i) => i.value);
+    if (!modes.length) return toast("Choose at least one mode", true);
+    runEvaluation(customRun, { modes, k: Number(kSel.value) });
+  } }, "Run with these settings");
+
   const exportJsonl = () => evalState.cases.map((c, i) => JSON.stringify({
     query_id: `q-${String(i + 1).padStart(3, "0")}`, query_text: c.question,
-    fault_family: (items.find((m) => m.id === c.expected[0])?.asset_id || "unassigned"),
-    relevant_memory_ids: c.expected, notes: "Labelled in the AegisOps console",
+    // Fault family is a reviewer's judgement; the console doesn't guess it.
+    fault_family: c.fault_family || "unassigned",
+    relevant_memory_ids: c.expected,
+    labeling_method: "console",
+    notes: `Labelled in the AegisOps console; not yet reviewed${leakedCase(c) ? "; question repeats a record title" : ""}`,
   })).join("\n") + "\n";
 
-  put(main, head,
-    notice("info", "Questions are saved in this browser only", "They aren't shared with other people or devices, and clearing site data removes them. Export queries.jsonl to keep them with the project."),
-    !all.ok ? notice("crit", "Records can't be loaded", all.error) : null,
-    pendingPanel(),
-    results,
-    h("h2", { class: "section-title" }, "Benchmark questions and run settings"),
-    h("div", { class: "grid grid-2" },
-      h("form", { class: "panel", onsubmit: (e) => {
-        e.preventDefault();
-        const question = q.value.trim();
-        if (!question) return q.focus();
-        const ids = [...expected.selectedOptions].map((o) => o.value);
-        if (!ids.length) return toast("Pick at least one record a correct answer must use", true);
-        evalState.cases.push({ question, expected: ids });
-        saveEvalCases(); q.value = ""; expected.selectedIndex = -1; drawCases(); q.focus();
-      } },
-        h("h2", null, "Add a question"),
-        h("div", { class: "field" }, h("label", { for: "e-q" }, "Question"), q),
-        h("div", { class: "field" }, h("label", { for: "e-exp" }, "Records a correct answer must use"), expected, h("small", null, "Hold Ctrl or ⌘ to choose several")),
-        h("div", null, h("button", { class: "btn", type: "submit" }, "Add question"))),
-      h("div", { class: "panel" },
-        h("h2", null, "Run"),
-        modeBoxes,
-        h("div", { class: "toolbar" }, h("div", { class: "field" }, h("label", { for: "e-k" }, "Top k"), kSel), run),
-        h("p", { class: "toolbar-note" }, "To record results for a report, export the questions and run the CLI benchmark against the full stack:"),
-        h("pre", { class: "cmd" }, "python -m evals.run_benchmark --queries evals/queries.jsonl --k 10"),
-        h("div", { class: "page-actions" },
-          h("button", { class: "btn", type: "button", onclick: () => evalState.cases.length ? download("queries.jsonl", exportJsonl(), "application/x-ndjson") : toast("Add a question first", true) }, "Export queries.jsonl"))),
-    ),
-    h("section", { "aria-label": "Benchmark questions" }, caseList),
-  );
-  drawCases();
-  drawResults();
+  const advanced = h("div", { class: "grid grid-2" },
+    h("section", { class: "panel", "aria-labelledby": "adv-run" },
+      h("h2", { id: "adv-run" }, "Custom run"),
+      h("p", { class: "toolbar-note" }, "Override the standard profile for a one-off check. Results replace the latest run and stay exploratory."),
+      modeBoxes,
+      h("div", { class: "toolbar" }, h("div", { class: "field" }, h("label", { for: "e-k" }, "Top k"), kSel), customRun)),
+    h("section", { class: "panel", "aria-labelledby": "adv-rec" },
+      h("h2", { id: "adv-rec" }, "Record a run for a report"),
+      h("p", { class: "toolbar-note" }, "The command-line benchmark measures latency properly (warm-up, five repeats) and writes result files with the dataset hash. Export the questions, copy them into the API container, then run:"),
+      h("pre", { class: "cmd" }, "docker cp queries.jsonl aegisops-api:/app/evals/queries.jsonl\ndocker compose exec api python -m evals.validate_queries --file evals/queries.jsonl\ndocker compose exec api python -m evals.run_benchmark --queries evals/queries.jsonl --k 10"),
+      h("div", { class: "page-actions" },
+        h("button", { class: "btn", type: "button", onclick: () => evalState.cases.length ? download("queries.jsonl", exportJsonl(), "application/x-ndjson") : toast("Add a question first", true) }, "Export queries.jsonl"),
+        h("button", { class: "btn", type: "button", disabled: !evalState.results, onclick: () => download(`aegisops-run-${evalState.results.run_id}.json`, JSON.stringify({ cases: evalState.cases, ...evalState.results }, null, 2), "application/json") }, "Download latest run (JSON)"))));
+
+  /* ------------------------------------------------------------ layout */
+
+  const detail = tabs([
+    { id: "overview", label: "Overview", panel: overviewHost },
+    { id: "questions", label: `Questions and labels`, panel: questionsHost },
+    { id: "failures", label: "Failure analysis", panel: failuresHost },
+    { id: "advanced", label: "Advanced", panel: advanced },
+  ], "Evaluation sections");
+
+  put(main, head, !all.ok ? notice("crit", "Records can't be loaded", all.error) : null, detail.el);
+  drawOverview();
+  drawQuestions();
+  drawFailures();
+  const want = evalState.pending ? "questions" : params?.get?.("tab");
+  if (want && ["overview", "questions", "failures", "advanced"].includes(want)) detail.select(want);
 }

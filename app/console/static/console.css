@@ -1138,3 +1138,53 @@ pre.cmd { margin: 0; padding: var(--space-3) var(--space-4); background: var(--s
   .chart-bar { fill: CanvasText; }
   .heat-cell { border: 1px solid CanvasText; }
 }
+
+/* ------------------------------------------------ evaluation phase 0 */
+
+.chart-whisker { stroke-width: 2.5; stroke-linecap: round; }
+.chart-whisker.is-s1 { stroke: var(--series-1); }
+.chart-whisker.is-quiet { stroke: var(--series-quiet); }
+.chart-dot { stroke: var(--surface); stroke-width: 2; }
+.chart-dot.is-s1 { fill: var(--series-1); }
+.chart-dot.is-quiet { fill: var(--series-quiet); }
+.tag-warn { border-color: var(--warn-fill); color: var(--warn); background: var(--warn-soft); }
+.candidate-list { max-height: 420px; overflow-y: auto; padding-right: var(--space-2); }
+.candidate { align-items: flex-start; padding: var(--space-2) 0; border-top: 1px solid var(--line); }
+.candidate:first-child { border-top: 0; }
+.candidate span { display: grid; gap: 2px; }
+.readout.is-warn dd { font-size: var(--t-xl); }
+@media (forced-colors: active) { .chart-dot, .chart-whisker { fill: CanvasText; stroke: CanvasText; } }
+
+/* ---------------------------------------------- evaluation overview */
+
+.readiness { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--space-5); }
+.readiness h2 .state { font-size: var(--t-lg); padding: 4px 12px 4px 10px; }
+.readiness h2 .state svg { width: 18px; height: 18px; }
+.readiness-why { margin: var(--space-3) 0 var(--space-2) var(--space-5); display: grid; gap: 2px; color: var(--ink-2); }
+.readiness-next { border-left: 1px solid var(--line); padding-left: var(--space-5); display: grid; gap: var(--space-2); align-content: start; }
+.readiness-next h3 { font-size: var(--t-lg); }
+.readiness-next > p:not(.prov-label):not(.cell-sub) { color: var(--ink-2); max-width: 60ch; }
+.readiness.is-exploratory { border-left: 4px solid var(--warn-fill); }
+.readiness.is-indicative { border-left: 4px solid var(--info); }
+.readiness.is-decision { border-left: 4px solid var(--ok); }
+.field-hint:empty { display: none; }
+.plain-list { list-style: none; display: grid; gap: 2px; }
+.plain-list .btn-quiet { min-height: 0; padding: 0; white-space: normal; text-align: left; font-weight: 500; }
+.picker { gap: var(--space-3); }
+pre.cmd { white-space: pre-wrap; word-break: break-all; }
+@media (max-width: 860px) {
+  .readiness { grid-template-columns: minmax(0, 1fr); }
+  .readiness-next { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: var(--space-4); }
+}
+
+/* Native controls (checkboxes, selects, scrollbars) follow the console's own
+   theme, not the operating system's: without this, a dark Windows theme draws
+   dark, filled-looking checkboxes on the light console. */
+:root { color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; } }
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+/* Readouts fit their count: four or five tiles stay on one row when there is room. */
+.readouts { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.readout { border-left: 0; box-shadow: inset 1px 0 0 var(--line); }

@@ -102,6 +102,38 @@ export function logBars({ rows, unit, label, cls = "is-s1" }) {
   return svg;
 }
 
+/** Dot-and-whisker on a 0..1 scale: the mean as a dot, its 95% interval as a
+ *  line with end caps. rows: [{ label, mean, lo, hi, text, cls }]. */
+export function dotWhisker({ rows, label }) {
+  const W = 720, left = 140, right = 150, rowH = 34, top = 12, axisH = 26;
+  const plotW = W - left - right;
+  const H = top + rows.length * rowH + axisH;
+  const X = (v) => left + Math.max(0, Math.min(1, v)) * plotW;
+  const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": label });
+  for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+    svg.append(s("line", { class: t === 0 ? "chart-base" : "chart-grid", x1: X(t), x2: X(t), y1: top - 4, y2: H - axisH }));
+    svg.append(s("text", { class: "chart-tick", x: X(t), y: H - 8, "text-anchor": "middle" }, `${Math.round(t * 100)}%`));
+  }
+  rows.forEach((row, i) => {
+    const y = top + i * rowH + rowH / 2;
+    svg.append(s("text", { class: "chart-label", x: left - 12, y: y + 5, "text-anchor": "end" }, row.label));
+    if (typeof row.mean !== "number") {
+      svg.append(s("text", { class: "chart-value is-muted", x: left + 6, y: y + 5 }, "not measured"));
+      return;
+    }
+    const hasCI = typeof row.lo === "number" && typeof row.hi === "number";
+    if (hasCI) {
+      svg.append(s("line", { class: `chart-whisker ${row.cls || "is-s1"}`, x1: X(row.lo), x2: X(row.hi), y1: y, y2: y }));
+      svg.append(s("line", { class: `chart-whisker ${row.cls || "is-s1"}`, x1: X(row.lo), x2: X(row.lo), y1: y - 6, y2: y + 6 }));
+      svg.append(s("line", { class: `chart-whisker ${row.cls || "is-s1"}`, x1: X(row.hi), x2: X(row.hi), y1: y - 6, y2: y + 6 }));
+    }
+    svg.append(s("circle", { class: `chart-dot ${row.cls || "is-s1"}`, cx: X(row.mean), cy: y, r: 6 }));
+    svg.append(s("text", { class: "chart-value", x: W - right + 12, y: y + 5 }, row.text));
+    svg.append(s("rect", { class: "chart-hit", x: left, y: y - rowH / 2, width: plotW, height: rowH, tabindex: "0", "data-tip": `${row.label}: ${row.text}` }));
+  });
+  return svg;
+}
+
 /** Sequential step (0-3) for a 0..1 score; 0 is reserved for exactly zero. */
 export function heatStep(v) {
   if (typeof v !== "number") return null;

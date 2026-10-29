@@ -6,6 +6,7 @@ Supports semantic, graph, hybrid, and agentic modes.
 """
 from __future__ import annotations
 
+import inspect
 import logging
 import time
 from typing import Callable, Optional
@@ -28,8 +29,9 @@ from app.evaluation.models import (
 
 logger = logging.getLogger(__name__)
 
-# (question, mode) -> (answer or None for retrieval-only modes, ranked memory IDs,
-#                       retrieval_ms, generation_ms)
+# (question, mode[, anchor_memory_id]) -> (answer or None for retrieval-only
+# modes, ranked memory IDs, retrieval_ms, generation_ms). The anchor argument is
+# optional so existing two-argument retrieval functions keep working.
 RetrievalFn = Callable[
     [str, str],
     tuple[Optional[str], list[str], float, float],
@@ -52,6 +54,11 @@ class EvaluationRunner:
     ) -> None:
         self._retrieve = retrieval_fn
         self.run_name = run_name
+        try:
+            params = inspect.signature(retrieval_fn).parameters.values()
+            self._takes_anchor = sum(1 for p in params if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)) >= 3
+        except (TypeError, ValueError):
+            self._takes_anchor = False
 
     def evaluate(
         self,
@@ -88,9 +95,10 @@ class EvaluationRunner:
         )
 
         try:
-            answer, retrieved_ids, retr_ms, gen_ms = self._retrieve(
-                case.question, mode.value
-            )
+            if self._takes_anchor:
+                answer, retrieved_ids, retr_ms, gen_ms = self._retrieve(case.question, mode.value, case.anchor_memory_id)
+            else:
+                answer, retrieved_ids, retr_ms, gen_ms = self._retrieve(case.question, mode.value)
             result.answer = answer or ""
             result.retrieved_memory_ids = retrieved_ids
             result.retrieval_latency_ms = retr_ms

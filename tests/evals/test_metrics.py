@@ -47,3 +47,15 @@ def test_methods_needing_a_down_backend_are_absent():
 def test_empty_relevant_set_is_vacuous_and_mrr_respects_k():
     assert recall_at_k(["a"], [], k=5) == 1.0
     assert mrr_at_k(["x", "y", "a"], {"a"}, k=2) == 0.0
+
+
+def test_citation_after_the_full_stop_counts_for_its_sentence():
+    from app.evaluation.metrics import groundedness_score
+
+    cited_after = (
+        "Porosity was caused by a hardened, cracked vacuum port seal on line 2. [Memory 4]\n\n"
+        "The prior fix replaced all vacuum port seals on lines 1 through 3. [Memory 6]"
+    )
+    assert groundedness_score(cited_after) == 1.0
+    half = "Porosity was caused by a hardened, cracked vacuum port seal. [Memory 4] The resin supplier also changed last spring."
+    assert groundedness_score(half) == 0.5

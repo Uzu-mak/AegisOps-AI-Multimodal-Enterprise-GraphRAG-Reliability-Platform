@@ -4,6 +4,7 @@ import argparse
 import csv
 import hashlib
 import json
+import os
 import subprocess
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -42,6 +43,10 @@ DEFAULT_WARMUP = 1
 
 
 def _git_commit() -> str:
+    # The image excludes .git, so a build or run can pass the commit in.
+    env_sha = os.getenv("GIT_SHA", "").strip()
+    if env_sha:
+        return env_sha
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
     except Exception:
@@ -454,7 +459,9 @@ def run_benchmark(
         "by_fault_family": by_fault_family,
         "retriever_configs": {
             "top_k": k,
-            "fusion_constant_k": 60,
+            # Hybrid is not rank fusion: vector matches come first, then graph
+            # links fill a quota of max(1, k // 4) (app/retrieval/hybrid.py).
+            "hybrid_merge": "vector results first; graph-only links fill max(1, k // 4) slots",
             "embedding_model": backend_status.get("embedding_model"),
             "latency_includes_query_embedding": True,
             "warmup_runs": warmup,

@@ -32,6 +32,16 @@ def token_principal(token):
             return Principal(str(tenant), tuple(str(r) for r in roles))
     return None
 
+READ_ONLY_POSTS = frozenset({
+    "/api/v1/search/semantic",
+    "/api/v1/search/hybrid",
+    "/api/v1/search/graph-related",
+    "/api/v1/graphrag/query",
+    "/api/v1/investigations",
+    "/api/v1/evaluation/runs",
+})
+
+
 async def identity_middleware(request, call_next):
     mode = os.getenv("AUTH_MODE", "local")
     principal = None
@@ -44,9 +54,10 @@ async def identity_middleware(request, call_next):
         if principal is None:
             return JSONResponse(status_code=401, content={"detail": "A valid API access token is required"}, headers={"WWW-Authenticate": "Bearer"})
         if request.method not in {"GET", "HEAD", "OPTIONS"} and not set(principal.roles).intersection({"writer", "admin"}):
-            # Read-only POST endpoints remain available to viewers.
-            reads = ("/search/", "/graphrag/query", "/investigations", "/evaluation/runs")
-            if not any(request.url.path.endswith(p) or p in request.url.path for p in reads) or request.url.path.endswith("/findings"):
+            # Read-only POST endpoints remain available to viewers. Exact paths
+            # only: a substring match would also exempt any future write route
+            # nested under one of these (e.g. /evaluation/runs/{id}/promote).
+            if request.url.path.rstrip("/") not in READ_ONLY_POSTS:
                 return JSONResponse(status_code=403, content={"detail": "Writer role required"})
         if "/system/" in request.url.path and not request.url.path.endswith("/health") and "admin" not in principal.roles:
             return JSONResponse(status_code=403, content={"detail": "Administrator role required for infrastructure metrics"})
