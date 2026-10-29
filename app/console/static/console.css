@@ -1188,3 +1188,5 @@ pre.cmd { white-space: pre-wrap; word-break: break-all; }
 /* Readouts fit their count: four or five tiles stay on one row when there is room. */
 .readouts { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .readout { border-left: 0; box-shadow: inset 1px 0 0 var(--line); }
+.row-actions { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); }
+.row-actions .btn-quiet { min-height: 0; padding: 2px 0; }

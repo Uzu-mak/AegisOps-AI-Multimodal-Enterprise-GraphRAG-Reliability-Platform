@@ -37,11 +37,26 @@ export async function viewEvaluation(params) {
   // Older saved questions have no leak flag; work it out from their labels.
   const leakedCase = (c) => (typeof c.leaked === "boolean" ? c.leaked : leakage(c.question, c.expected.map(titleOf)).leaked);
   if (!evalState.results) evalState.results = loadLastRun();
+  // Saved history (server): the newest saved run wins over this browser's copy.
+  let history = { ok: false, runs: [] };
+  const loadHistory = async () => {
+    const r = await api("/evaluation/history", { params: { limit: 50 } });
+    history = { ok: r.ok, runs: r.ok ? r.data.runs || [] : [], error: r.ok ? null : r.error };
+    return history;
+  };
+  await loadHistory();
+  const newest = history.runs[0];
+  if (newest && (!evalState.results || String(newest.generated_at) > String(evalState.results.generated_at || ""))) {
+    const full = await api(`/evaluation/history/${newest.run_id}`);
+    if (full.ok) { evalState.results = full.data; saveLastRun(full.data); }
+  }
 
   const results = h("div", { class: "stack", "aria-live": "polite" });
   const overviewHost = h("div", { class: "stack" });
   const questionsHost = h("div", { class: "stack" });
   const failuresHost = h("div", { class: "stack" });
+  const runsHost = h("div", { class: "stack" });
+  const runDetail = h("div", { class: "stack", "aria-live": "polite" });
 
   const download = (name, text, type) => {
     const a = h("a", { href: URL.createObjectURL(new Blob([text], { type })), download: name });
@@ -67,14 +82,16 @@ export async function viewEvaluation(params) {
     saveLastRun(r.data);
     drawOverview();
     drawFailures();
+    await loadHistory();
+    drawRuns();
+    if (!r.data.persisted) toast("This run wasn't saved to history (only writers and administrators save runs, or the history store is unavailable).", true);
     if (slow) toast("Investigation mode was left out: this many questions would pass the 2-minute limit. Run it from Advanced with fewer questions.", true);
   };
 
   /* ------------------------------------------------- latest run (charts) */
 
-  const drawResults = () => {
-    const res = evalState.results;
-    if (!res) return put(results);
+  const drawResults = (res = evalState.results, host = results) => {
+    if (!res) return put(host);
     const k = res.k;
     const pm = res.per_mode || {};
     const modesRun = res.modes_run || [];
@@ -168,7 +185,7 @@ export async function viewEvaluation(params) {
             h("td", { class: "num" }, `${num(v.latency_p50_ms, 0)} ms`));
         })))));
 
-    put(results,
+    put(host,
       h("div", { class: "run-head" },
         h("h2", null, "Latest run"),
         h("p", { class: "toolbar-note" }, `${fmtWhen(res.generated_at)}, run in this browser, ${n} question${n === 1 ? "" : "s"}.`)),
@@ -378,10 +395,11 @@ export async function viewEvaluation(params) {
     if (!res) return put(failuresHost, empty("No run to analyse", "Run an evaluation first; misses appear here with what is known about each."));
     const k = res.k;
     const cases = (res.cases || []).filter((c) => c.labeled !== false);
-    const expectedOf = (q) => evalState.cases.find((c) => c.question === q)?.expected || [];
+    // Saved runs carry their own labels; older browser runs fall back to the current questions.
+    const expectedOf = (q, row) => row?.expected_memory_ids?.length ? row.expected_memory_ids : evalState.cases.find((c) => c.question === q)?.expected || [];
     const foundBy = (q, id) => cases.filter((c) => c.question === q && (c.retrieved_memory_ids || []).slice(0, k).includes(id)).map((c) => MODE_LABEL[c.mode]);
     const misses = cases.filter((c) => c.error || c.recall_at_k < 1).map((c) => {
-      const exp = expectedOf(c.question);
+      const exp = expectedOf(c.question, c);
       const missing = exp.filter((id) => !(c.retrieved_memory_ids || []).slice(0, k).includes(id));
       let diagnosis;
       if (c.error) diagnosis = ["Run error", c.error];
@@ -409,6 +427,102 @@ export async function viewEvaluation(params) {
               h("td", null, first ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(first) }, titleOf(first)) : "Nothing returned"),
               h("td", null, c.mode === "agentic" ? navLink("Investigate", "investigate", { q: c.question }) : navLink("Search", "search", { q: c.question, mode: c.mode })))))))
         : empty("No misses", "Every labelled record was found by every mode in the latest run."));
+  };
+
+  /* -------------------------------------------------------------- runs */
+
+  // Saved runs, newest first. A run can be reopened, or compared with the
+  // previous run measured the same way (same embedding and top k): runs made
+  // differently are never compared directly.
+  const bestOf = (run) => {
+    const pm = run.per_mode || {};
+    const m = (run.modes_run || []).filter((x) => typeof pm[x]?.recall_at_k === "number").sort((a, b) => pm[b].recall_at_k - pm[a].recall_at_k).at(0);
+    return m ? { mode: m, recall: pm[m].recall_at_k, mrr: pm[m].mrr } : null;
+  };
+  const comparable = (a, b) => a.k === b.k && a.embedding_model === b.embedding_model;
+
+  const openRun = async (summary) => {
+    put(runDetail, h("div", { class: "panel" }, skeleton()));
+    const r = await api(`/evaluation/history/${summary.run_id}`);
+    if (!r.ok) return put(runDetail, notice("crit", "That run couldn't be loaded", r.error));
+    const host = h("div", { class: "stack" });
+    put(runDetail, h("div", { class: "page-actions" },
+      h("button", { class: "btn", type: "button", onclick: () => { evalState.results = r.data; saveLastRun(r.data); drawOverview(); drawFailures(); detail.select("failures"); } }, "Analyse failures in this run")), host);
+    drawResults(r.data, host);
+    runDetail.scrollIntoView({ block: "start" });
+  };
+
+  const compareRuns = async (newer, older) => {
+    put(runDetail, h("div", { class: "panel" }, skeleton()));
+    const [a, b] = await Promise.all([api(`/evaluation/history/${newer.run_id}`), api(`/evaluation/history/${older.run_id}`)]);
+    if (!a.ok || !b.ok) return put(runDetail, notice("crit", "Couldn't load both runs", (a.ok ? b : a).error));
+    const A = a.data, B = b.data, k = A.k;
+    const key = (c) => `${c.mode}\u0000${c.question}`;
+    const before = new Map(B.cases.filter((c) => c.labeled !== false && !c.error).map((c) => [key(c), c]));
+    const pairs = A.cases.filter((c) => c.labeled !== false && !c.error && before.has(key(c))).map((c) => ({ now: c, then: before.get(key(c)) }));
+    const modes = (A.modes_run || []).filter((m) => (B.modes_run || []).includes(m));
+    const rankOf = (c) => (c.mrr ? Math.round(1 / c.mrr) : null);
+    const verdict = (p) => (p.now.recall_at_k > p.then.recall_at_k || (p.now.recall_at_k === p.then.recall_at_k && p.now.mrr > p.then.mrr) ? "better"
+      : p.now.recall_at_k < p.then.recall_at_k || (p.now.recall_at_k === p.then.recall_at_k && p.now.mrr < p.then.mrr) ? "worse" : "same");
+    const rows = modes.map((m) => {
+      const ps = pairs.filter((p) => p.now.mode === m);
+      const diff = bootstrapMean(ps.map((p) => p.now.recall_at_k - p.then.recall_at_k));
+      const count = (v) => ps.filter((p) => verdict(p) === v).length;
+      return { m, n: ps.length, diff, better: count("better"), worse: count("worse"), same: count("same") };
+    });
+    const signed = (v) => `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.round(Math.abs(v) * 100)} pts`;
+    const changed = pairs.filter((p) => verdict(p) !== "same");
+    put(runDetail,
+      h("section", { class: "panel", "aria-labelledby": "cmp-runs" },
+        h("div", { class: "panel-head" }, h("div", null,
+          h("h2", { id: "cmp-runs" }, "What changed between these runs"),
+          h("p", null, `${fmtWhen(A.generated_at)} compared with ${fmtWhen(B.generated_at)}. Only questions asked in both runs are compared, question by question.`))),
+        !pairs.length ? notice("info", "No questions in common", "These runs share no labelled questions, so there is nothing to compare question by question.") : null,
+        h("div", { class: "table-wrap" }, h("table", null,
+          h("thead", null, h("tr", null, ["Mode", "Questions in both", `Change in recall at ${k} (95% interval)`, "Better", "Worse", "Same"].map((c, i) => h("th", { scope: "col", class: i ? "num" : null }, c)))),
+          h("tbody", null, rows.map((r) => h("tr", null,
+            h("th", { scope: "row" }, MODE_LABEL[r.m]),
+            h("td", { class: "num" }, String(r.n)),
+            h("td", { class: "num" }, !r.diff ? "—" : r.diff.lo === null ? `${signed(r.diff.mean)} (1 question)` : `${signed(r.diff.mean)} (${signed(r.diff.lo)} to ${signed(r.diff.hi)})`),
+            h("td", { class: "num" }, String(r.better)), h("td", { class: "num" }, String(r.worse)), h("td", { class: "num" }, String(r.same))))))),
+        h("p", { class: "toolbar-note" }, "An interval that includes ±0 means the change could be noise at this sample size. Better or worse counts recall first, then how high the first relevant record ranked."),
+        changed.length ? h("div", { class: "table-wrap" }, h("table", null,
+          h("caption", null, `${changed.length} question × mode result${changed.length === 1 ? "" : "s"} changed`),
+          h("thead", null, h("tr", null, ["Question", "Mode", "Then", "Now", ""].map((c) => h("th", { scope: "col" }, c)))),
+          h("tbody", null, changed.map((p) => h("tr", null,
+            h("td", null, p.now.question), h("td", null, MODE_LABEL[p.now.mode]),
+            h("td", null, `${pct(p.then.recall_at_k)}${rankOf(p.then) ? `, first at #${rankOf(p.then)}` : ""}`),
+            h("td", null, `${pct(p.now.recall_at_k)}${rankOf(p.now) ? `, first at #${rankOf(p.now)}` : ""}`),
+            h("td", null, verdict(p) === "better" ? stateChip("Better", "normal") : stateChip("Worse", "warn"))))))) : null));
+    runDetail.scrollIntoView({ block: "start" });
+  };
+
+  const drawRuns = () => {
+    if (!history.ok) return put(runsHost, notice("warn", "Run history is unavailable", `${history.error || "The history endpoint didn't answer."} If the API was just updated, apply the database migration (alembic upgrade head).`));
+    const runs = history.runs;
+    if (!runs.length) return put(runsHost, empty("No saved runs yet", "Every evaluation you run from now on is saved here, so you can reopen it and compare it with the next one."), runDetail);
+    put(runsHost,
+      h("div", { class: "table-wrap" }, h("table", null,
+        h("caption", null, `${runs.length} saved run${runs.length === 1 ? "" : "s"}, newest first`),
+        h("thead", null, h("tr", null, ["Run", "Questions", "Modes", "Top k", "Embedding", "Best recall at k", "Evidence", ""].map((c) => h("th", { scope: "col" }, c)))),
+        h("tbody", null, runs.map((run, i) => {
+          const best = bestOf(run);
+          const strength = evidenceStrength({ n: run.question_count, semantic: !/fake|hashedterm/i.test(run.embedding_model || ""), source: run.source || "console" });
+          const prev = runs.slice(i + 1).find((o) => comparable(run, o));
+          return h("tr", null,
+            h("td", null, h("span", { class: "cell-title" }, fmtWhen(run.generated_at)), h("span", { class: "cell-sub" }, `${run.source || "console"}, ${shortId(run.run_id)}`)),
+            h("td", null, num(run.question_count)),
+            h("td", null, (run.modes_run || []).map((m) => MODE_LABEL[m]).join(", ")),
+            h("td", null, String(run.k)),
+            h("td", null, String(run.embedding_model || "").replace(/\(.*\)$/, "")),
+            h("td", null, best ? `${pct(best.recall)} (${MODE_LABEL[best.mode]})` : "—"),
+            h("td", null, stateChip(strength.label, strength.sev)),
+            h("td", null, h("div", { class: "row-actions" },
+              h("button", { class: "btn btn-quiet", type: "button", onclick: () => openRun(run) }, "Open"),
+              prev ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => compareRuns(run, prev) }, "Compare with previous")
+                : h("span", { class: "cell-sub", title: "No earlier run with the same embedding and top k" }, "No comparable earlier run"))));
+        })))),
+      runDetail);
   };
 
   /* ---------------------------------------------------------- advanced */
@@ -450,6 +564,7 @@ export async function viewEvaluation(params) {
 
   const detail = tabs([
     { id: "overview", label: "Overview", panel: overviewHost },
+    { id: "runs", label: "Runs", panel: runsHost },
     { id: "questions", label: `Questions and labels`, panel: questionsHost },
     { id: "failures", label: "Failure analysis", panel: failuresHost },
     { id: "advanced", label: "Advanced", panel: advanced },
@@ -459,6 +574,7 @@ export async function viewEvaluation(params) {
   drawOverview();
   drawQuestions();
   drawFailures();
+  drawRuns();
   const want = evalState.pending ? "questions" : params?.get?.("tab");
-  if (want && ["overview", "questions", "failures", "advanced"].includes(want)) detail.select(want);
+  if (want && ["overview", "runs", "questions", "failures", "advanced"].includes(want)) detail.select(want);
 }

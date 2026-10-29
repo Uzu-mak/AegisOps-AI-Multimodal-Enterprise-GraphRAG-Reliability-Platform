@@ -25,6 +25,12 @@ from app.api.deps import (
     get_memory_service,
     get_semantic_index,
 )
+import logging
+import os
+
+from app.core.security import current_principal
+from app.db.session import SessionLocal
+from app.evaluation import store
 from app.evaluation.models import EvalCase, RetrievalMode
 from app.evaluation.runner import EvaluationRunner
 from app.graphrag.pipeline import GraphRAGPipeline
@@ -32,6 +38,12 @@ from app.retrieval.models import RetrievalQuery
 from app.services.exceptions import MemoryNotFoundError
 
 router = APIRouter(prefix="/api/v1", tags=["evaluation"])
+logger = logging.getLogger(__name__)
+
+
+def _may_persist(principal) -> bool:
+    """Viewers may run evaluations (a read) but not add to the shared history."""
+    return principal is None or bool({"writer", "admin"} & set(principal.roles))
 
 Mode = Literal["semantic", "graph", "hybrid", "agentic"]
 
@@ -91,7 +103,7 @@ def run_evaluation(
         cases, [RetrievalMode(m) for m in runnable], k=request.k
     )
 
-    return {
+    payload = {
         "run_id": str(run.run_id),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "k": request.k,
@@ -118,3 +130,42 @@ def run_evaluation(
             for r in run.case_results
         ],
     }
+
+    # Keep the run in history. A history failure never fails the run itself.
+    principal = current_principal()
+    payload["persisted"] = False
+    if _may_persist(principal):
+        try:
+            with SessionLocal() as session:
+                store.save_run(
+                    session, payload,
+                    expected={c.case_id: c.expected_memory_ids for c in cases},
+                    anchors={c.case_id: c.anchor_memory_id for c in cases},
+                    tenant_id=principal.tenant_id if principal else None,
+                    llm_model=getattr(llm_provider, "get_model_name", lambda: None)() if "agentic" in runnable else None,
+                    commit=os.getenv("GIT_SHA") or None,
+                )
+            payload["persisted"] = True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Evaluation run %s not saved to history: %s", payload["run_id"], exc)
+    return payload
+
+
+@router.get("/evaluation/history")
+def evaluation_history(limit: int = 50) -> dict:
+    """Saved evaluation runs, newest first (summaries without per-case rows)."""
+    principal = current_principal()
+    with SessionLocal() as session:
+        runs = store.list_runs(session, tenant_id=principal.tenant_id if principal else None, limit=max(1, min(limit, 200)))
+    return {"runs": runs}
+
+
+@router.get("/evaluation/history/{run_id}")
+def evaluation_run(run_id: UUID) -> dict:
+    """One saved run in the same shape as POST /evaluation/runs, plus labels."""
+    principal = current_principal()
+    with SessionLocal() as session:
+        run = store.get_run(session, run_id, tenant_id=principal.tenant_id if principal else None)
+    if run is None:
+        raise HTTPException(status_code=404, detail="No saved evaluation run with that ID")
+    return run
