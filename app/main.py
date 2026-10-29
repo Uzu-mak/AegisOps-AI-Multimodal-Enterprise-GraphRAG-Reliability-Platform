@@ -76,6 +76,11 @@ async def instrument_http_requests(request: Request, call_next):
 def liveness():
     return {"status": "ok"}
 
+
+# Must equal the newest Alembic revision; tests/reliability/test_schema_revision.py checks it.
+EXPECTED_SCHEMA_REVISION = "20261029_0005"
+
+
 @ app.get("/health")
 @ app.get("/ready")
 def healthcheck():
@@ -85,7 +90,7 @@ def healthcheck():
             session.execute(text("SELECT revision FROM memories LIMIT 0"))
             session.execute(text("SELECT payload, next_attempt_at FROM projection_outbox LIMIT 0"))
             revision = session.scalar(text("SELECT version_num FROM alembic_version"))
-            if revision != "20261028_0004":
+            if revision != EXPECTED_SCHEMA_REVISION:
                 raise RuntimeError("Schema upgrade required")
     except Exception:
         return JSONResponse(status_code=503, content={"status": "not_ready", "database": "unavailable_or_schema_upgrade_required"})
