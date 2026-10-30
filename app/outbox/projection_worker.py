@@ -109,6 +109,9 @@ def reproject_all(
     embedding_provider: Any = None,
     only: Optional[str] = None,
     progress: Optional[Callable[[str, int, int], None]] = None,
+    ids: Optional[list[str]] = None,
+    attempts: int = 3,
+    backoff_seconds: float = 2.0,
 ) -> dict[str, Any]:
     """
     Re-project every canonical record into Qdrant and Neo4j.
@@ -116,30 +119,44 @@ def reproject_all(
     Use after changing EMBEDDING_PROVIDER (stored vectors must come from the
     same provider as query vectors) or after restoring a projection store.
     Stores that are unreachable are skipped and reported, not treated as done.
+
+    ``ids`` limits the run to those records (e.g. the ``failed_ids`` of an
+    earlier run). Transient failures (timeouts, dropped connections to the
+    embedding API) are retried ``attempts`` times with growing backoff; every
+    record that still fails is listed in ``failed_ids``.
     """
     from sqlalchemy import select
 
     qdrant_fn, neo4j_fn = build_projection_fns(connections, session_factory, embedding_provider)
-    with session_factory() as session:
-        ids = [str(i) for i in session.scalars(select(MemoryRecord.id)).all()]
+    if ids is None:
+        with session_factory() as session:
+            ids = [str(i) for i in session.scalars(select(MemoryRecord.id)).all()]
     report: dict[str, Any] = {"records": len(ids)}
     for name, fn in (("qdrant", qdrant_fn), ("neo4j", neo4j_fn)):
         if only and name != only:
             continue
-        done, errors = 0, []
+        done, errors, failed = 0, [], []
+        unavailable = False
         for memory_id in ids:
-            try:
-                fn(memory_id, "project")
-                done += 1
-                if progress and done % 250 == 0:
-                    progress(name, done, len(ids))
-            except ProjectionStoreUnavailable as exc:
-                errors = [str(exc)]
-                done = None
+            for attempt in range(1, max(1, attempts) + 1):
+                try:
+                    fn(memory_id, "project")
+                    done += 1
+                    if progress and done % 250 == 0:
+                        progress(name, done, len(ids))
+                    break
+                except ProjectionStoreUnavailable as exc:
+                    errors, failed, done, unavailable = [str(exc)], [], None, True
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    if attempt < attempts:
+                        time.sleep(backoff_seconds * attempt)
+                        continue
+                    errors.append(f"{memory_id}: {exc}")
+                    failed.append(memory_id)
+            if unavailable:
                 break
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"{memory_id}: {exc}")
-        report[name] = {"projected": done, "errors": errors[:5], "error_count": len(errors)}
+        report[name] = {"projected": done, "errors": errors[:5], "error_count": len(errors), "failed_ids": failed}
     return report
 
 
@@ -151,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
     parser.add_argument("--reproject-all", action="store_true",
                         help="Re-project every record once (e.g. after changing EMBEDDING_PROVIDER) and exit.")
     parser.add_argument("--only", choices=["qdrant", "neo4j"], help="With --reproject-all: re-project one store only.")
+    parser.add_argument("--ids", nargs="+", metavar="MEMORY_ID",
+                        help="With --reproject-all: only these records (e.g. failed_ids from an earlier run).")
     parser.add_argument("--retry-failed", action="store_true", help="Requeue failed projection jobs without changing canonical records")
     args = parser.parse_args(argv)
     if args.retry_failed:
@@ -170,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
             def show(store: str, done: int, total: int) -> None:
                 print(f"{store}: {done}/{total}", file=sys.stderr, flush=True)
 
-            print(json.dumps(reproject_all(connections, only=args.only, progress=show), indent=2))
+            print(json.dumps(reproject_all(connections, only=args.only, progress=show, ids=args.ids), indent=2))
         finally:
             connections.close_all()
         return 0
