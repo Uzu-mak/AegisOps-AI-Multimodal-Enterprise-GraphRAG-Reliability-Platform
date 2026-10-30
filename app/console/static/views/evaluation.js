@@ -482,11 +482,18 @@ export async function viewEvaluation(params) {
     drawQuestions(); drawOverview();
   };
 
+  let showArchived = false;
   const drawSets = async (host) => {
     put(host, h("div", { class: "panel" }, skeleton()));
     const r = await api("/evaluation/question-sets");
     if (!r.ok) return put(host, notice("warn", "Question sets are unavailable", `${r.error}. If the API was just updated, apply the database migration (alembic upgrade head).`));
-    const sets = r.data.sets || [];
+    const all = r.data.sets || [];
+    // Discarded and retired versions stay on record but are out of the way unless asked for.
+    const archived = all.filter((x) => x.status === "discarded" || x.status === "retired");
+    const sets = showArchived ? all : all.filter((x) => !archived.includes(x));
+    const archiveToggle = archived.length ? h("button", { class: "btn btn-quiet", type: "button", "aria-pressed": String(showArchived),
+      onclick: () => { showArchived = !showArchived; drawSets(host); } },
+      showArchived ? "Hide discarded and retired" : `Show discarded and retired (${archived.length})`) : null;
     const ws = evalState.setRef;
     const nameIn = h("input", { type: "text", id: "qs-name", autocomplete: "off", value: ws?.name || "", placeholder: "e.g. MaintNet engines" });
     const authorIn = h("input", { type: "text", id: "qs-author", autocomplete: "name", value: myName(), placeholder: "Your name" });
@@ -512,7 +519,9 @@ export async function viewEvaluation(params) {
     } }, unchanged ? "No changes to save" : "Save working list as a set");
 
     const review = (S, action) => {
-      const who = h("input", { type: "text", autocomplete: "name", value: action === "submit" ? myName() : "", "aria-label": "Your name" });
+      // Reviewers type their own name; the author's name is prefilled for the author's own actions.
+      const who = h("input", { type: "text", autocomplete: "name", value: ["submit", "discard"].includes(action) ? myName() : "", "aria-label": "Your name" });
+      const msg = h("p", { class: "field-hint", role: "alert" });
       const note = h("input", { type: "text", "aria-label": "Note", placeholder: action === "return" ? "What needs changing" : "Optional note" });
       const label = { submit: "Submit for review", approve: "Approve", return: "Return to author", retire: "Retire", discard: "Discard draft" }[action];
       put(actionHost, h("div", { class: "panel review-form" },
@@ -524,17 +533,20 @@ export async function viewEvaluation(params) {
           h("div", { class: "field" }, h("label", null, "Your name"), who),
           h("div", { class: "field field-grow" }, h("label", null, "Note"), note),
           h("button", { class: "btn btn-primary", type: "button", onclick: async (e) => {
-            if (!who.value.trim()) return toast("Say who you are", true);
+            if (!who.value.trim()) { put(msg, "Enter your name first."); return who.focus(); }
             busy(e.currentTarget, true);
             const res = await api(`/evaluation/question-sets/${S.id}/${action}`, { method: "POST", body: { by: who.value.trim(), note: note.value.trim() || null } });
             busy(e.currentTarget, false);
-            if (!res.ok) return toast(res.error, true);
+            if (!res.ok) return put(msg, res.status === 422 && /discard|literal/i.test(JSON.stringify(res.data || "")) ? "The server doesn't know this action yet: rebuild the API (docker compose up -d --build) and try again." : res.error);
             if (action === "submit") rememberName(who.value.trim());
             if (evalState.setRef?.id === S.id) { evalState.setRef = { ...evalState.setRef, status: res.data.status }; saveEvalCases({ keepSet: true }); }
             toast(`${S.name} v${S.version} is now ${SET_STATUS[res.data.status][0].toLowerCase()}`);
             drawQuestions(); drawOverview();
           } }, label),
-          h("button", { class: "btn", type: "button", onclick: () => put(actionHost) }, "Cancel"))));
+          h("button", { class: "btn", type: "button", onclick: () => put(actionHost) }, "Cancel")),
+        msg));
+      actionHost.scrollIntoView({ block: "nearest" });
+      (who.value ? note : who).focus();
     };
 
     put(host, h("section", { class: "panel", "aria-labelledby": "qs-title" },
@@ -542,9 +554,10 @@ export async function viewEvaluation(params) {
         h("h2", { id: "qs-title" }, "Question sets"),
         h("p", null, "Versioned and reviewed. Draft → in review → approved; approved versions are frozen, and changes make a new version."))),
       ws ? h("p", { class: "toolbar-note" }, `Working list: ${ws.name} v${ws.version} (${SET_STATUS[ws.status]?.[0].toLowerCase() || ws.status})${ws.modified ? ", edited since loading, so runs won't count as that version" : ""}.`) : null,
+      archiveToggle,
       sets.length ? h("div", { class: "table-wrap" }, h("table", null,
         h("thead", null, h("tr", null, ["Set", "Status", "Questions", "Author", "Reviewed by", ""].map((c) => h("th", { scope: "col" }, c)))),
-        h("tbody", null, sets.map((S) => h("tr", null,
+        h("tbody", null, sets.map((S) => h("tr", { class: archived.includes(S) ? "is-archived" : null },
           h("td", null, h("span", { class: "cell-title" }, `${S.name} v${S.version}`), h("span", { class: "cell-sub" }, `#${S.content_hash.slice(0, 8)}`)),
           h("td", null, stateChip(...(SET_STATUS[S.status] || [S.status, "info"])), S.review_note ? h("span", { class: "cell-sub" }, S.review_note) : null),
           h("td", null, num(S.question_count)),
