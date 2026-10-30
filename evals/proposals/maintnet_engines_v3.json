@@ -1,0 +1,111 @@
+{
+  "name": "MaintNet engines",
+  "author": "Claude (assistant proposal)",
+  "labeling_method": "assistant-proposed",
+  "source": "MaintNet aviation maintenance logbook (Kaggle), imported as work orders; WO numbers are the dataset's IDENT values",
+  "note": "Proposed labels for human review. Each question is phrased away from record titles; the expected records are the ones a correct answer must use. Questions with no_answer are checked against the full dataset text. v3 (v2 was a discarded copy) rewords two v1 questions that pointed at more than one fault; labels unchanged.",
+  "questions": [
+    {
+      "question": "What fixed the engine that died when someone tried to adjust the idle?",
+      "wo": [
+        "100002",
+        "100001"
+      ],
+      "why": "100002 replaced the fuel servo (the fix); 100001 shows the idle would not adjust. 100003 is a post-fix run-up, cut off at source."
+    },
+    {
+      "question": "Which parts were cleaned to cure an engine vibration that had to be checked in the air?",
+      "wo": [
+        "100909",
+        "100910",
+        "100911"
+      ],
+      "why": "Fuel injector nozzles cleaned (#1, 3 and #2, 4) and plugs/leads work. 100908 only says 'for test flight'."
+    },
+    {
+      "question": "What inspections followed an engine overspeed of about 3400 RPM during an autorotation?",
+      "wo": [
+        "100150",
+        "100151",
+        "100152"
+      ],
+      "why": "Valve-train and engine overspeed inspection steps. 100149 is only a leak check."
+    },
+    {
+      "question": "What was found inside the engine after a 350 RPM magneto drop on the left side?",
+      "wo": [
+        "101580",
+        "101579",
+        "101582"
+      ],
+      "why": "101580 found the oil control ring gap facing down; 101579 and 101582 are the cylinder findings and rework. 101581 is reassembly only."
+    },
+    {
+      "question": "What was wrong with the cylinder whose compression read 25 psi with air escaping at the exhaust?",
+      "wo": [
+        "103906"
+      ],
+      "why": "Bent exhaust valve found. 103905 is only an ops and leak check."
+    },
+    {
+      "question": "What was done about an oil line rubbing against the wiring?",
+      "wo": [
+        "100276"
+      ],
+      "why": "Oil return line replaced. 100275 is only a leak check."
+    },
+    {
+      "question": "Which pump was replaced when an engine ran rough from the moment it was started?",
+      "wo": [
+        "104110",
+        "104109"
+      ],
+      "why": "Engine-driven fuel pump replaced (104110); 104109 confirms the rough running from start. v3: v1's wording ('uneven running and a low idle') equally fitted MN-105847 (rough, idle low, valve work), so it no longer pointed at one fault."
+    },
+    {
+      "question": "What work did cracks in the turbine nozzle require?",
+      "wo": [
+        "100535",
+        "100536",
+        "100537",
+        "100534"
+      ],
+      "why": "Engine removal and disassembly, turbine swap with a loaner, reconnection and reinstallation."
+    },
+    {
+      "question": "When oil was seen seeping out of the top cowl, what was the source?",
+      "wo": [
+        "105054",
+        "103863"
+      ],
+      "why": "Leak verified at the lifting eye (105054) and three backbone bolts leaking (103863). v3: v1 said 'upper engine cover', which also reads as a rocker cover and matched MN-103078 (rocker cover gasket)."
+    },
+    {
+      "question": "How is a cylinder fixed when one of its valves keeps hanging up?",
+      "wo": [
+        "100377",
+        "100915",
+        "100916",
+        "100917",
+        "105270",
+        "103965"
+      ],
+      "why": "Sticking-valve repairs across four incidents: staking, cylinder replacement or rework, exhaust guide reamed."
+    },
+    {
+      "question": "What was done after the aircraft was struck by lightning?",
+      "no_answer": true,
+      "why": "No record in the dataset mentions lightning."
+    },
+    {
+      "question": "How was the cabin pressurisation fault fixed?",
+      "no_answer": true,
+      "why": "No record mentions pressurisation. (A bird-strike question was dropped: the data has a prop-strike incident, which would make the label arguable.)"
+    },
+    {
+      "question": "How was the turbocharger wastegate fault fixed?",
+      "no_answer": true,
+      "why": "No record mentions a turbocharger or wastegate."
+    }
+  ]
+}

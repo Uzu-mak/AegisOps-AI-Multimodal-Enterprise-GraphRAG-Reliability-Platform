@@ -160,6 +160,62 @@ def reproject_all(
     return report
 
 
+def prune_orphans(
+    connections: ProjectionConnections,
+    session_factory: Callable = SessionLocal,
+    embedding_provider: Any = None,
+    dry_run: bool = True,
+) -> dict[str, Any]:
+    """
+    Remove search entries whose record no longer exists in PostgreSQL.
+
+    Orphans come from records that were deleted, or from writes made against
+    another database (e.g. a test run) that shared these stores. They take
+    search slots and are then dropped at hydration, so results look worse than
+    the canonical data supports. PostgreSQL is never changed. With dry_run
+    (the default) nothing is deleted; the report says what would be.
+    """
+    from sqlalchemy import select
+
+    with session_factory() as session:
+        known = {str(i) for i in session.scalars(select(MemoryRecord.id)).all()}
+    report: dict[str, Any] = {"records": len(known), "dry_run": dry_run}
+
+    index = connections.semantic_index(embedding_provider or create_embedding_provider())
+    if index is None:
+        report["qdrant"] = {"error": "Qdrant unavailable"}
+    else:
+        orphans, offset = [], None
+        while True:
+            points, offset = index.client.scroll(collection_name=index.collection_name, limit=1000, offset=offset,
+                                                 with_payload=["memory_id"], with_vectors=False)
+            orphans += [p.id for p in points if str((p.payload or {}).get("memory_id", p.id)) not in known]
+            if offset is None:
+                break
+        if orphans and not dry_run:
+            from qdrant_client.models import PointIdsList
+
+            for i in range(0, len(orphans), 500):
+                index.client.delete(collection_name=index.collection_name, points_selector=PointIdsList(points=orphans[i:i + 500]))
+        report["qdrant"] = {"orphans": len(orphans), "removed": 0 if dry_run else len(orphans)}
+
+    graph = connections.graph_index()
+    if graph is None:
+        report["neo4j"] = {"error": "Neo4j unavailable"}
+    else:
+        with graph._driver.session(database=graph._database) as session:
+            ids = [r["id"] for r in session.run("MATCH (m:Memory) RETURN m.memory_id AS id")]
+            orphans = [i for i in ids if str(i) not in known]
+            removed = loose = 0
+            if orphans and not dry_run:
+                session.run("MATCH (m:Memory) WHERE m.memory_id IN $ids DETACH DELETE m", ids=orphans).consume()
+                removed = len(orphans)
+                # Assets, incidents and the like left with no connections only served the orphans.
+                loose = session.run("MATCH (n) WHERE NOT n:Memory AND NOT (n)--() DELETE n RETURN count(n) AS n").single()["n"]
+        report["neo4j"] = {"orphans": len(orphans), "removed": removed, "unconnected_nodes_removed": loose}
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
     import argparse
     import json
@@ -168,6 +224,9 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
     parser.add_argument("--reproject-all", action="store_true",
                         help="Re-project every record once (e.g. after changing EMBEDDING_PROVIDER) and exit.")
     parser.add_argument("--only", choices=["qdrant", "neo4j"], help="With --reproject-all: re-project one store only.")
+    parser.add_argument("--prune-orphans", action="store_true",
+                        help="Report search entries whose record is not in PostgreSQL; add --apply to remove them.")
+    parser.add_argument("--apply", action="store_true", help="With --prune-orphans: actually remove the orphans.")
     parser.add_argument("--ids", nargs="+", metavar="MEMORY_ID",
                         help="With --reproject-all: only these records (e.g. failed_ids from an earlier run).")
     parser.add_argument("--retry-failed", action="store_true", help="Requeue failed projection jobs without changing canonical records")
@@ -179,6 +238,13 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
             result = session.execute(update(ProjectionOutboxEvent).where(ProjectionOutboxEvent.status == "failed").values(status="pending", retry_count=0, next_attempt_at=None, lease_token=None, lease_until=None))
             session.commit()
             print(f"Requeued {result.rowcount} projection jobs")
+        return 0
+    if args.prune_orphans:
+        connections = get_connections()
+        try:
+            print(json.dumps(prune_orphans(connections, dry_run=not args.apply), indent=2))
+        finally:
+            connections.close_all()
         return 0
     if args.reproject_all:
         logging.basicConfig(level=logging.WARNING)

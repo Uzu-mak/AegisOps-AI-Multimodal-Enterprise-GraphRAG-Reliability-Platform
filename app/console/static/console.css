@@ -1224,3 +1224,5 @@ pre.cmd { white-space: pre-wrap; word-break: break-all; }
 .review-form { border-color: var(--line-strong); }
 .review-form p { margin: 0 0 var(--space-3); }
 tr.is-archived td { color: var(--ink-3, var(--ink)); opacity: .75; }
+.working-run { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.working-run p { margin: 0; }

@@ -23,6 +23,25 @@ if os.getenv("AEGISOPS_TEST_REAL_LLM") != "1":
     os.environ["LLM_PROVIDER"] = "test"
 
 
+# Writes through the API also project into Qdrant and Neo4j at once. Without
+# isolation, an integration run against the test database leaves vectors and
+# graph nodes for test records in the live stores, where they take search
+# slots. Integration runs therefore use their own Qdrant collection, and
+# Neo4j is switched off for API tests (tests that need it override this).
+def _live_collection() -> str:
+    provider = os.getenv("EMBEDDING_PROVIDER", "fake")
+    if os.getenv("QDRANT_COLLECTION_NAME"):
+        return os.environ["QDRANT_COLLECTION_NAME"]
+    if provider == "fake":
+        return "memories"
+    model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small").replace("-", "_")
+    return f"memories_{provider}_{model}_{os.getenv('EMBEDDING_DIMENSION', '1536')}"
+
+
+if os.getenv("AEGISOPS_INTEGRATION_TESTS") == "1" and not _live_collection().endswith("_tests"):
+    os.environ["QDRANT_COLLECTION_NAME"] = _live_collection() + "_tests"
+
+
 # Integration fixtures delete rows: never let a default developer DB receive them.
 def pytest_collection_modifyitems(config, items):
     import pytest
@@ -70,3 +89,23 @@ def isolated_sessions():
         for column, column_type in zip(columns, old):
             column.type = column_type
         engine.dispose()
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_live_graph_writes(request):
+    """API-level tests never write to the shared Neo4j unless they override this themselves."""
+    path = str(request.node.path).replace("\\", "/")
+    if not any(part in path for part in ("/tests/api/", "/tests/integration/", "/tests/evals/")) or request.node.get_closest_marker("live_graph"):
+        yield
+        return
+    from app.api.deps import get_graph_memory_index
+    from app.main import app
+
+    off = lambda: None  # noqa: E731
+    app.dependency_overrides.setdefault(get_graph_memory_index, off)
+    yield
+    if app.dependency_overrides.get(get_graph_memory_index) is off:
+        app.dependency_overrides.pop(get_graph_memory_index)

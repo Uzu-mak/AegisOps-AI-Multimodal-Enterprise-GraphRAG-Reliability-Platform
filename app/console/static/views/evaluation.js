@@ -41,6 +41,15 @@ export function searchText(run) {
     : `Mixed: ${keys.map((k) => `${num(it[k])} ${(TEXT_FORMAT_LABEL[k] || k).toLowerCase()}`).join(", ")}`;
 }
 
+// The owner is whoever submitted the set for review; until then, its author.
+// When the author is the assistant, it is shown as who proposed the labels.
+const isAssistant = (name) => /^claude\b/i.test(name || "");
+const ownerOf = (S) => {
+  const submitted = [...(S.history || [])].reverse().find((h) => h.action === "submit")?.by;
+  return submitted || (isAssistant(S.created_by) ? "Not yet submitted" : S.created_by);
+};
+const proposedBy = (S) => (isAssistant(S.created_by) ? "the assistant" : null);
+
 // Absence handling: did Investigation say "the records don't answer this"
 // when none do, and avoid saying it when one does? A lexical check on the
 // answer (app/evaluation/metrics.py is_abstention), shown with that caveat.
@@ -132,8 +141,11 @@ export async function viewEvaluation(params) {
     drawOverview();
     drawFailures();
     await loadHistory();
-    const saved = history.runs.find((x) => x.run_id === r.data.run_id);
-    if (saved) { evalState.results.question_set = saved.question_set; saveLastRun(evalState.results); drawOverview(); }
+    // Use the saved copy: it adds each question's labels and the question set it measured.
+    if (r.data.persisted) {
+      const full = await api(`/evaluation/history/${r.data.run_id}`);
+      if (full.ok) { evalState.results = full.data; saveLastRun(full.data); drawOverview(); drawFailures(); }
+    }
     drawRuns();
     drawSummary();
     if (!r.data.persisted) toast("This run wasn't saved to history (only writers and administrators save runs, or the history store is unavailable).", true);
@@ -464,15 +476,16 @@ export async function viewEvaluation(params) {
   const toServer = (c) => ({ question: c.question, expected_memory_ids: c.noAnswer ? [] : c.expected, anchor_memory_id: c.anchor || null,
     expects_no_answer: !!c.noAnswer, labeling_method: c.label_method || "console", note: c.note || null });
   let confirmLoad = null;
-  const loadSet = async (summary) => {
+  const loadSet = async (summary, verb = "Load") => {
     const unsaved = evalState.cases.length && !workingSet();
     if (unsaved && confirmLoad !== summary.id) {
       confirmLoad = summary.id;
-      return toast(`The working list has ${evalState.cases.length} unsaved question${evalState.cases.length === 1 ? "" : "s"}. Save it as a set first, or select Load again to replace it.`, true);
+      toast(`The working list has ${evalState.cases.length} unsaved question${evalState.cases.length === 1 ? "" : "s"}. Save it as a set first, or select ${verb} again to replace it.`, true);
+      return false;
     }
     confirmLoad = null;
     const r = await api(`/evaluation/question-sets/${summary.id}`);
-    if (!r.ok) return toast(r.error, true);
+    if (!r.ok) { toast(r.error, true); return false; }
     const S = r.data;
     evalState.cases = S.questions.map((q) => ({ question: q.question, expected: q.expected_memory_ids, anchor: q.anchor_memory_id,
       noAnswer: q.expects_no_answer, leaked: q.leaked, label_method: q.labeling_method, note: q.note }));
@@ -480,6 +493,13 @@ export async function viewEvaluation(params) {
     saveEvalCases({ keepSet: true });
     toast(`Loaded ${S.name} v${S.version} (${SET_STATUS[S.status][0].toLowerCase()})`);
     drawQuestions(); drawOverview();
+    return true;
+  };
+  // Load a set (unless it is already the unedited working list) and run it.
+  const runSet = async (summary, button) => {
+    const ws = workingSet();
+    if (!(ws && ws.id === summary.id) && !(await loadSet(summary, "Run"))) return;
+    runEvaluation(button, STANDARD);
   };
 
   let showArchived = false;
@@ -553,17 +573,26 @@ export async function viewEvaluation(params) {
       h("div", { class: "panel-head" }, h("div", null,
         h("h2", { id: "qs-title" }, "Question sets"),
         h("p", null, "Versioned and reviewed. Draft → in review → approved; approved versions are frozen, and changes make a new version."))),
-      ws ? h("p", { class: "toolbar-note" }, `Working list: ${ws.name} v${ws.version} (${SET_STATUS[ws.status]?.[0].toLowerCase() || ws.status})${ws.modified ? ", edited since loading, so runs won't count as that version" : ""}.`) : null,
+      // Run from where the set was chosen; results open on the Overview tab.
+      evalState.cases.length ? h("div", { class: "working-run" },
+        h("p", { class: "toolbar-note" }, ws ? `Working list: ${ws.name} v${ws.version} (${SET_STATUS[ws.status]?.[0].toLowerCase() || ws.status})${ws.modified ? ", edited since loading, so runs won't count as that version" : ""}.`
+          : `Working list: ${evalState.cases.length} question${evalState.cases.length === 1 ? "" : "s"}, not saved as a set.`),
+        h("button", { class: "btn btn-primary", type: "button", onclick: (e) => runEvaluation(e.currentTarget, STANDARD) },
+          ws && !ws.modified ? `Run standard evaluation on v${ws.version}` : "Run standard evaluation")) : null,
       archiveToggle,
       sets.length ? h("div", { class: "table-wrap" }, h("table", null,
-        h("thead", null, h("tr", null, ["Set", "Status", "Questions", "Author", "Reviewed by", ""].map((c) => h("th", { scope: "col" }, c)))),
+        h("thead", null, h("tr", null, ["Set", "Status", "Questions", "Owner", "Reviewed by", ""].map((c) => h("th", { scope: "col" }, c)))),
         h("tbody", null, sets.map((S) => h("tr", { class: archived.includes(S) ? "is-archived" : null },
           h("td", null, h("span", { class: "cell-title" }, `${S.name} v${S.version}`), h("span", { class: "cell-sub" }, `#${S.content_hash.slice(0, 8)}`)),
           h("td", null, stateChip(...(SET_STATUS[S.status] || [S.status, "info"])), S.review_note ? h("span", { class: "cell-sub" }, S.review_note) : null),
           h("td", null, num(S.question_count)),
-          h("td", null, S.created_by),
+          // Owner: the person who put the set forward for review (or is drafting it).
+          // Who proposed the labels stays visible, so assistant labels are never passed off as anyone's own.
+          h("td", null, ownerOf(S), proposedBy(S) ? h("span", { class: "cell-sub" }, `Labels proposed by ${proposedBy(S)}`) : null),
           h("td", null, S.reviewed_by ? `${S.reviewed_by}, ${fmtWhen(S.reviewed_at)}` : "—"),
           h("td", null, h("div", { class: "row-actions" },
+            ["draft", "in_review", "approved"].includes(S.status)
+              ? h("button", { class: "btn btn-quiet", type: "button", title: "Load this version and run the standard evaluation on it", onclick: (e) => runSet(S, e.currentTarget) }, "Run") : null,
             h("button", { class: "btn btn-quiet", type: "button", onclick: () => loadSet(S) }, "Load"),
             S.status === "draft" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "submit") }, "Submit for review") : null,
             S.status === "draft" ? h("button", { class: "btn btn-quiet", type: "button", title: "Set this draft aside. It is kept for the record but never used or credited to a run.", onclick: () => review(S, "discard") }, "Discard") : null,
