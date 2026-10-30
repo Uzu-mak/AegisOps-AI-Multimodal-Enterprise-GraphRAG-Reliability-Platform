@@ -46,7 +46,7 @@ def test_lifecycle_draft_review_approve_then_new_version(session):
     ok = datasets.transition(session, sid, action="approve", by="Ama (reliability lead)", note="Labels checked", tenant_id=None)
     assert ok["status"] == "approved" and ok["reviewed_by"] == "Ama (reliability lead)"
     assert [h["status"] for h in ok["history"]] == ["draft", "in_review", "approved"]
-    v2 = _new(session)
+    v2 = datasets.create_version(session, name="MaintNet engines", questions=QS[:1], author="Jeremiah", titles=TITLES, tenant_id=None)
     assert v2["version"] == 2 and v2["parent_id"] == v1["id"] and v2["status"] == "draft"
 
 
@@ -96,3 +96,22 @@ def test_a_run_is_matched_to_the_approved_version_it_measured(session):
     listed = store.list_runs(session, tenant_id=None)[0]
     assert listed["question_set"]["name"] == "MaintNet engines" and listed["question_set"]["status"] == "approved"
     assert store.get_run(session, uuid.UUID(run_id), tenant_id=None)["question_set"]["version"] == 1
+
+
+def test_an_unchanged_copy_is_not_saved_as_a_new_version(session):
+    sid = uuid.UUID(_new(session)["id"])
+    datasets.transition(session, sid, action="submit", by="Jeremiah", note=None, tenant_id=None)
+    with pytest.raises(QuestionSetError, match="Nothing changed"):
+        _new(session)
+
+
+def test_a_draft_can_be_discarded_kept_for_the_record_and_never_credited(session):
+    v1 = datasets.create_version(session, name="S", questions=QS[:1], author="a", titles=TITLES, tenant_id=None)
+    gone = datasets.transition(session, uuid.UUID(v1["id"]), action="discard", by="a", note="duplicate", tenant_id=None)
+    assert gone["status"] == "discarded" and gone["question_count"] == 1  # nothing deleted
+    assert datasets.sets_by_hash(session, {v1["content_hash"]}, tenant_id=None) == {}
+    v2 = datasets.create_version(session, name="S", questions=QS[:1] + QS[1:], author="a", titles=TITLES, tenant_id=None)
+    assert v2["version"] == 2 and v2["status"] == "draft"  # the name is free for a new draft
+    with pytest.raises(QuestionSetError):
+        datasets.transition(session, uuid.UUID(v1["id"]), action="discard", by="a", note=None, tenant_id=None)
+

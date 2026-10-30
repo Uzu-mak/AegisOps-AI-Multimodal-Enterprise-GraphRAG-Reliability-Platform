@@ -27,7 +27,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from app.db.base import Base
 
 _JSON = JSON().with_variant(JSONB(), "postgresql")
-STATUSES = ("draft", "in_review", "approved", "retired")
+STATUSES = ("draft", "in_review", "approved", "retired", "discarded")
 LEAK_THRESHOLD = 0.6  # same rule as the console (lib/evalmath.js)
 
 
@@ -165,6 +165,8 @@ def create_version(session: Session, *, name: str, questions: list[dict[str, Any
                              .order_by(EvalQuestionSetRecord.version.desc()).limit(1)).scalar_one_or_none()
     if latest is not None and latest.status == "draft":
         raise QuestionSetError(f"'{name}' already has a draft (version {latest.version}); edit that draft instead")
+    if latest is not None and latest.content_hash == dataset_hash(questions):
+        raise QuestionSetError(f"Nothing changed since {name} v{latest.version}; a new version needs different questions or labels")
     s = EvalQuestionSetRecord(tenant_id=tenant_id, name=name, version=(latest.version + 1) if latest else 1,
                               parent_id=latest.id if latest else None, status="draft", content_hash="", created_by=author,
                               history=[{"status": "draft", "by": author, "at": _now().isoformat()}])
@@ -205,10 +207,15 @@ def replace_questions(session: Session, set_id: UUID, *, questions: list[dict[st
 
 
 def transition(session: Session, set_id: UUID, *, action: str, by: str, note: Optional[str], tenant_id: Optional[str]) -> dict[str, Any]:
-    """submit (draft -> in_review), approve / return (in_review -> approved / draft), retire (approved -> retired)."""
+    """submit (draft -> in_review), approve / return (in_review -> approved / draft),
+    retire (approved -> retired), discard (draft -> discarded).
+
+    Nothing is deleted: a discarded draft keeps its questions and history for
+    the audit trail, is never credited to a run, and frees the name for a new draft.
+    """
     s = _load(session, set_id, tenant_id)
     allowed = {"submit": ("draft", "in_review"), "approve": ("in_review", "approved"),
-               "return": ("in_review", "draft"), "retire": ("approved", "retired")}
+               "return": ("in_review", "draft"), "retire": ("approved", "retired"), "discard": ("draft", "discarded")}
     if action not in allowed:
         raise QuestionSetError(f"Unknown action {action}")
     frm, to = allowed[action]
@@ -235,9 +242,10 @@ def sets_by_hash(session: Session, hashes: set[str], *, tenant_id: Optional[str]
     """Question-set versions whose content matches these hashes (approved preferred)."""
     if not hashes:
         return {}
-    rank = {"approved": 0, "in_review": 1, "retired": 2, "draft": 3}
+    rank = {"approved": 0, "in_review": 1, "retired": 2, "draft": 3}  # discarded drafts are never credited
     out: dict[str, dict[str, Any]] = {}
-    for s in session.execute(_scope(select(EvalQuestionSetRecord).where(EvalQuestionSetRecord.content_hash.in_(hashes)), tenant_id)).scalars():
+    for s in session.execute(_scope(select(EvalQuestionSetRecord).where(EvalQuestionSetRecord.content_hash.in_(hashes),
+                                                                         EvalQuestionSetRecord.status != "discarded"), tenant_id)).scalars():
         cur = out.get(s.content_hash)
         if cur is None or rank[s.status] < rank[cur["status"]]:
             out[s.content_hash] = {"id": str(s.id), "name": s.name, "version": s.version, "status": s.status, "reviewed_by": s.reviewed_by}

@@ -289,7 +289,7 @@ def replace_question_set_questions(set_id: UUID, request: QuestionsIn, service=D
 
 
 @router.post("/evaluation/question-sets/{set_id}/{action}")
-def transition_question_set(set_id: UUID, action: Literal["submit", "approve", "return", "retire"], request: TransitionIn) -> dict:
+def transition_question_set(set_id: UUID, action: Literal["submit", "approve", "return", "retire", "discard"], request: TransitionIn) -> dict:
     """Review workflow. In token mode only administrators approve or return a set."""
     principal = current_principal()
     if action in ("approve", "return") and principal is not None and "admin" not in principal.roles:

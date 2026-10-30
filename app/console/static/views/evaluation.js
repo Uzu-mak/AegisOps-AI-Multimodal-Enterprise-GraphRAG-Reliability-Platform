@@ -25,7 +25,7 @@ const runDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime
 export const setEvidence = (qs) => (qs && qs.status === "approved" ? { source: "reviewed", humanApproved: true } : { source: "console" });
 // The question-set version the working list was loaded from, while unedited.
 const workingSet = () => (evalState.setRef && !evalState.setRef.modified ? evalState.setRef : null);
-const SET_STATUS = { draft: ["Draft", "info"], in_review: ["In review", "warn"], approved: ["Approved", "normal"], retired: ["Retired", "muted"] };
+const SET_STATUS = { draft: ["Draft", "info"], in_review: ["In review", "warn"], approved: ["Approved", "normal"], retired: ["Retired", "muted"], discarded: ["Discarded", "muted"] };
 const NAME_KEY = "aegis-eval-name";
 const myName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
 const rememberName = (v) => { try { localStorage.setItem(NAME_KEY, v); } catch {} };
@@ -491,7 +491,10 @@ export async function viewEvaluation(params) {
     const nameIn = h("input", { type: "text", id: "qs-name", autocomplete: "off", value: ws?.name || "", placeholder: "e.g. MaintNet engines" });
     const authorIn = h("input", { type: "text", id: "qs-author", autocomplete: "name", value: myName(), placeholder: "Your name" });
     const actionHost = h("div");
-    const saveBtn = h("button", { class: "btn btn-primary", type: "button", disabled: !evalState.cases.length, onclick: async (e) => {
+    // An unedited copy of a loaded version would only duplicate it.
+    const unchanged = !!workingSet();
+    const saveBtn = h("button", { class: "btn btn-primary", type: "button", disabled: !evalState.cases.length || unchanged,
+      title: unchanged ? "The working list is exactly the loaded version; edit it first to save a new version" : null, onclick: async (e) => {
       const name = nameIn.value.trim(), author = authorIn.value.trim();
       if (!name || !author) return toast("Give the set a name and say who you are", true);
       rememberName(author);
@@ -506,12 +509,12 @@ export async function viewEvaluation(params) {
       saveEvalCases({ keepSet: true });
       toast(draft ? `Updated draft ${name} v${res.data.version}` : `Saved ${name} v${res.data.version} as a draft`);
       drawQuestions(); drawOverview();
-    } }, "Save working list as a set");
+    } }, unchanged ? "No changes to save" : "Save working list as a set");
 
     const review = (S, action) => {
       const who = h("input", { type: "text", autocomplete: "name", value: action === "submit" ? myName() : "", "aria-label": "Your name" });
       const note = h("input", { type: "text", "aria-label": "Note", placeholder: action === "return" ? "What needs changing" : "Optional note" });
-      const label = { submit: "Submit for review", approve: "Approve", return: "Return to author", retire: "Retire" }[action];
+      const label = { submit: "Submit for review", approve: "Approve", return: "Return to author", retire: "Retire", discard: "Discard draft" }[action];
       put(actionHost, h("div", { class: "panel review-form" },
         h("p", null, h("strong", null, `${label}: ${S.name} v${S.version}`),
           action === "approve" ? " Approve only after checking every question's labels against the records. You must not be the author." : "",
@@ -550,6 +553,7 @@ export async function viewEvaluation(params) {
           h("td", null, h("div", { class: "row-actions" },
             h("button", { class: "btn btn-quiet", type: "button", onclick: () => loadSet(S) }, "Load"),
             S.status === "draft" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "submit") }, "Submit for review") : null,
+            S.status === "draft" ? h("button", { class: "btn btn-quiet", type: "button", title: "Set this draft aside. It is kept for the record but never used or credited to a run.", onclick: () => review(S, "discard") }, "Discard") : null,
             S.status === "in_review" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "approve") }, "Approve") : null,
             S.status === "in_review" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "return") }, "Return") : null,
             S.status === "approved" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "retire") }, "Retire") : null))))))) : null,
