@@ -161,6 +161,8 @@ def create_version(session: Session, *, name: str, questions: list[dict[str, Any
     name = " ".join(name.split())
     if not name:
         raise QuestionSetError("A question set needs a name")
+    if not " ".join((author or "").split()):
+        raise QuestionSetError("Say who is creating this set")
     latest = session.execute(_scope(select(EvalQuestionSetRecord).where(EvalQuestionSetRecord.name == name), tenant_id)
                              .order_by(EvalQuestionSetRecord.version.desc()).limit(1)).scalar_one_or_none()
     if latest is not None and latest.status == "draft":

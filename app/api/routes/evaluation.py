@@ -28,7 +28,7 @@ from app.api.deps import (
 import logging
 import os
 
-from app.core.security import current_principal
+from app.core.security import actor_name, current_principal
 from app.db.session import SessionLocal
 from app.evaluation import datasets, store
 from app.evaluation.models import EvalCase, RetrievalMode
@@ -213,7 +213,7 @@ class QuestionIn(BaseModel):
 
 class QuestionSetIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
-    author: str = Field(..., min_length=1, max_length=200, description="Attested name; users are not yet verified")
+    author: Optional[str] = Field(default=None, max_length=200, description="Ignored when signed in: the signed-in username is used")
     questions: list[QuestionIn] = Field(..., min_length=1, max_length=500)
 
 
@@ -222,7 +222,7 @@ class QuestionsIn(BaseModel):
 
 
 class TransitionIn(BaseModel):
-    by: str = Field(..., min_length=1, max_length=200, description="Attested name of who does this")
+    by: Optional[str] = Field(default=None, max_length=200, description="Ignored when signed in: the signed-in username is used")
     note: Optional[str] = Field(default=None, max_length=2000)
 
 
@@ -260,7 +260,7 @@ def create_question_set(request: QuestionSetIn, service=Depends(get_memory_servi
     titles = _titles(service, request.questions)
     with SessionLocal() as session:
         try:
-            return datasets.create_version(session, name=request.name, questions=_plain(request.questions), author=request.author,
+            return datasets.create_version(session, name=request.name, questions=_plain(request.questions), author=actor_name() or request.author or "",
                                            titles=titles, tenant_id=_tenant())
         except datasets.QuestionSetError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
@@ -290,13 +290,14 @@ def replace_question_set_questions(set_id: UUID, request: QuestionsIn, service=D
 
 @router.post("/evaluation/question-sets/{set_id}/{action}")
 def transition_question_set(set_id: UUID, action: Literal["submit", "approve", "return", "retire", "discard"], request: TransitionIn) -> dict:
-    """Review workflow. In token mode only administrators approve or return a set."""
+    """Review workflow. When signed in, only reviewers and administrators approve or return a set,
+    and the signed-in username is recorded (a typed name is ignored)."""
     principal = current_principal()
-    if action in ("approve", "return") and principal is not None and "admin" not in principal.roles:
-        raise HTTPException(status_code=403, detail="Only an administrator can review a question set")
+    if action in ("approve", "return") and principal is not None and not {"reviewer", "admin"} & set(principal.roles):
+        raise HTTPException(status_code=403, detail="Only a reviewer or administrator can review a question set")
     with SessionLocal() as session:
         try:
-            return datasets.transition(session, set_id, action=action, by=request.by, note=request.note, tenant_id=_tenant())
+            return datasets.transition(session, set_id, action=action, by=actor_name() or request.by or "", note=request.note, tenant_id=_tenant())
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc))
         except datasets.QuestionSetError as exc:

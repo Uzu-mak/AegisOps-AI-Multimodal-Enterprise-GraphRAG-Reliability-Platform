@@ -12,3 +12,4 @@ qdrant-client==1.11.0
 neo4j==5.27.0
 kafka-python-ng==2.2.3
 openai>=1.50.0
+pyjwt[crypto]==2.9.0

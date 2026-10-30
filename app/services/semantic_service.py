@@ -22,8 +22,16 @@ SEMANTIC_TEXT_VERSION = "context-header-1"
 TEXT_FORMATS = ("plain", SEMANTIC_TEXT_VERSION)
 
 
+# Default is "plain". Measured 30 Oct 2026 on 6,183 MaintNet work orders with
+# the approved MaintNet engines v1 set: the context header raised the first
+# relevant record's rank (MRR 0.55 -> 0.63) but lowered recall (top 10:
+# 0.72 -> 0.65; top 5: 0.50 -> 0.42), because without assets the header is
+# mostly boilerplate. Kept available for data with meaningful asset context.
+DEFAULT_TEXT_FORMAT = "plain"
+
+
 def active_text_format() -> str:
-    value = os.getenv("SEMANTIC_TEXT_FORMAT", SEMANTIC_TEXT_VERSION)
+    value = os.getenv("SEMANTIC_TEXT_FORMAT", DEFAULT_TEXT_FORMAT)
     if value not in TEXT_FORMATS:
         raise ValueError(f"SEMANTIC_TEXT_FORMAT must be one of {', '.join(TEXT_FORMATS)}, not {value!r}")
     return value

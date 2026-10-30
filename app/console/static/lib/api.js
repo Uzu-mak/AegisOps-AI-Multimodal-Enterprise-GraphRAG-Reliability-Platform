@@ -1,11 +1,12 @@
 import { dialog } from "../components/dialog.js";
 import { render } from "../console.js";
 import { s } from "./dom.js";
+import { auth, refresh, signIn } from "./auth.js";
 
 export const API = "/api/v1";
 /* ------------------------------------------------------------------ API */
 
-export async function api(path, { method = "GET", body, timeout = 20000, params } = {}) {
+export async function api(path, { method = "GET", body, timeout = 20000, params, retried = false } = {}) {
   const url = new URL(API + path, location.origin);
   if (params) for (const [k, v] of Object.entries(params)) if (v !== "" && v !== null && v !== undefined) url.searchParams.set(k, v);
   const ctrl = new AbortController();
@@ -20,7 +21,15 @@ export async function api(path, { method = "GET", body, timeout = 20000, params 
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    if (res.status === 401) showSignIn();
+    if (res.status === 401) {
+      if (auth.mode === "oidc") {
+        // The access token expired or was revoked: refresh once, else sign in again.
+        if (!retried && await refresh()) return api(path, { method, body, timeout, params, retried: true });
+        signIn();
+      } else {
+        showSignIn();
+      }
+    }
     if (!res.ok) return { ok: false, status: res.status, data, error: describeError(res.status, data) };
     return { ok: true, status: res.status, data };
   } catch (err) {

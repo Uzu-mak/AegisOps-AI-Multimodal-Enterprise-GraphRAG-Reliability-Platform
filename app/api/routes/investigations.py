@@ -19,7 +19,7 @@ from app.agents.workflow import AegisOpsWorkflow
 from app.api.deps import get_hybrid_retriever, get_llm_provider, get_memory_service
 from app.api.routes.memories import memory_to_response
 from app.api.schemas.memory import MemoryResponse
-from app.core.security import current_principal
+from app.core.security import actor_name, current_principal
 from app.db.session import SessionLocal
 from app.graphrag.pipeline import GraphRAGPipeline
 from app.graphrag.provider import LLMProvider
@@ -174,6 +174,7 @@ def record_finding(
         promotion_reason=f"Confirmed by operator from investigation: {request.question[:200]}",
         metadata={"investigation_question": request.question,
                   "answer_was_synthetic": request.answer_was_synthetic,
+                  "recorded_by": actor_name(),
                   "anchor_memory_id": str(request.anchor_memory_id) if request.anchor_memory_id else None},
         **context,
     )

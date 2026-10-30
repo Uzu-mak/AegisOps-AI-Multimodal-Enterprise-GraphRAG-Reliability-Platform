@@ -22,6 +22,10 @@ if ENV_FILE.exists():
 if os.getenv("AEGISOPS_TEST_REAL_LLM") != "1":
     os.environ["LLM_PROVIDER"] = "test"
 
+# Tests run in local auth mode unless a test switches mode itself, whatever
+# AUTH_MODE the developer's .env or container uses.
+os.environ["AUTH_MODE"] = "local"
+
 
 # Writes through the API also project into Qdrant and Neo4j at once. Without
 # isolation, an integration run against the test database leaves vectors and

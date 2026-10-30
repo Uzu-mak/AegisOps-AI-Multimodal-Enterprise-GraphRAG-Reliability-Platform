@@ -11,6 +11,11 @@ x-app: &app
     NEO4J_PASSWORD: ${NEO4J_PASSWORD:-aegisops}
     NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
     KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    # Sign-in (used when AUTH_MODE=oidc in .env). The issuer is the URL the
+    # browser uses; the API fetches signing keys over the Docker network.
+    OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080/realms/aegisops}
+    OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-aegisops-console}
+    OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/aegisops/protocol/openid-connect/certs}
   networks: [aegisops-network]
 
 services:
@@ -89,6 +94,27 @@ services:
     depends_on:
       migrate: {condition: service_completed_successfully}
     restart: unless-stopped
+  keycloak:
+    # Sign-in provider for AUTH_MODE=oidc. Started with the "auth" profile
+    # (COMPOSE_PROFILES=auth in .env). The realm, roles, console client and
+    # starter users are imported from deploy/keycloak on first start.
+    profiles: [auth]
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: aegisops-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change_me_keycloak}
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports: ["127.0.0.1:${KEYCLOAK_HOST_PORT:-8080}:8080"]
+    volumes:
+      - ./deploy/keycloak:/opt/keycloak/data/import:ro
+      - aegisops_keycloak_data:/opt/keycloak/data/h2
+    restart: unless-stopped
+    networks: [aegisops-network]
   kafka:
     profiles: [integration]
     image: apache/kafka:4.3.1
@@ -141,6 +167,7 @@ services:
 networks:
   aegisops-network: {driver: bridge}
 volumes:
+  aegisops_keycloak_data:
   aegisops_pgdata:
   aegisops_qdrant_storage:
   aegisops_neo4j_data:

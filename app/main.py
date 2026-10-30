@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.exception_handlers import register_exception_handlers
+from app.api.routes.auth import router as auth_router
 from app.api.routes.evaluation import router as evaluation_router
 from app.api.routes.imports import router as import_router
 from app.api.routes.investigations import router as investigation_router
@@ -40,6 +41,7 @@ app = FastAPI(
     description="Operational Memory Engine — PostgreSQL + Qdrant + Neo4j + GraphRAG",
     version="2.0.0",
 )
+app.include_router(auth_router)
 app.include_router(memory_router)
 app.include_router(search_router)
 app.include_router(investigation_router)
@@ -78,7 +80,7 @@ def liveness():
 
 
 # Must equal the newest Alembic revision; tests/reliability/test_schema_revision.py checks it.
-EXPECTED_SCHEMA_REVISION = "20261030_0006"
+EXPECTED_SCHEMA_REVISION = "20261030_0007"
 
 
 @ app.get("/health")

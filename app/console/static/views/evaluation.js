@@ -1,6 +1,7 @@
 import { busy, empty, fmtWhen, notice, num, pageHead, pct, scoreBar, shortId, skeleton, stateChip, toast, typeLabel } from "../components/ui.js";
 import { dotWhisker, heatStep, logBars, withTooltip } from "../components/charts.js";
 import { tabs } from "../components/tabs.js";
+import { auth, hasRole, signedIn } from "../lib/auth.js";
 import { managerSummary } from "./evaluation-summary.js";
 import { showMemory } from "../components/records.js";
 import { bootstrapMean, evidenceStrength, leakage, shuffled } from "../lib/evalmath.js";
@@ -27,7 +28,8 @@ export const setEvidence = (qs) => (qs && qs.status === "approved" ? { source: "
 const workingSet = () => (evalState.setRef && !evalState.setRef.modified ? evalState.setRef : null);
 const SET_STATUS = { draft: ["Draft", "info"], in_review: ["In review", "warn"], approved: ["Approved", "normal"], retired: ["Retired", "muted"], discarded: ["Discarded", "muted"] };
 const NAME_KEY = "aegis-eval-name";
-const myName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
+// Signed in: the name is the signed-in username and can't be typed over.
+const myName = () => { if (signedIn()) return auth.user.username; try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
 const rememberName = (v) => { try { localStorage.setItem(NAME_KEY, v); } catch {} };
 
 // How the searched vectors were built, as counted in Qdrant at run time.
@@ -515,12 +517,15 @@ export async function viewEvaluation(params) {
       onclick: () => { showArchived = !showArchived; drawSets(host); } },
       showArchived ? "Hide discarded and retired" : `Show discarded and retired (${archived.length})`) : null;
     const ws = evalState.setRef;
+    // Show only what the signed-in role can do (the API enforces it regardless).
+    const canDraft = hasRole("engineer", "admin");
+    const canReview = hasRole("reviewer", "admin");
     const nameIn = h("input", { type: "text", id: "qs-name", autocomplete: "off", value: ws?.name || "", placeholder: "e.g. MaintNet engines" });
-    const authorIn = h("input", { type: "text", id: "qs-author", autocomplete: "name", value: myName(), placeholder: "Your name" });
+    const authorIn = h("input", { type: "text", id: "qs-author", autocomplete: "name", value: myName(), placeholder: "Your name", readonly: signedIn() ? "" : null, title: signedIn() ? "From your sign-in" : null });
     const actionHost = h("div");
     // An unedited copy of a loaded version would only duplicate it.
     const unchanged = !!workingSet();
-    const saveBtn = h("button", { class: "btn btn-primary", type: "button", disabled: !evalState.cases.length || unchanged,
+    const saveBtn = h("button", { class: "btn btn-primary", type: "button", disabled: !evalState.cases.length || unchanged || !canDraft,
       title: unchanged ? "The working list is exactly the loaded version; edit it first to save a new version" : null, onclick: async (e) => {
       const name = nameIn.value.trim(), author = authorIn.value.trim();
       if (!name || !author) return toast("Give the set a name and say who you are", true);
@@ -540,7 +545,8 @@ export async function viewEvaluation(params) {
 
     const review = (S, action) => {
       // Reviewers type their own name; the author's name is prefilled for the author's own actions.
-      const who = h("input", { type: "text", autocomplete: "name", value: ["submit", "discard"].includes(action) ? myName() : "", "aria-label": "Your name" });
+      const who = h("input", { type: "text", autocomplete: "name", value: signedIn() || ["submit", "discard"].includes(action) ? myName() : "", "aria-label": "Your name",
+        readonly: signedIn() ? "" : null, title: signedIn() ? "From your sign-in" : null });
       const msg = h("p", { class: "field-hint", role: "alert" });
       const note = h("input", { type: "text", "aria-label": "Note", placeholder: action === "return" ? "What needs changing" : "Optional note" });
       const label = { submit: "Submit for review", approve: "Approve", return: "Return to author", retire: "Retire", discard: "Discard draft" }[action];
@@ -594,17 +600,17 @@ export async function viewEvaluation(params) {
             ["draft", "in_review", "approved"].includes(S.status)
               ? h("button", { class: "btn btn-quiet", type: "button", title: "Load this version and run the standard evaluation on it", onclick: (e) => runSet(S, e.currentTarget) }, "Run") : null,
             h("button", { class: "btn btn-quiet", type: "button", onclick: () => loadSet(S) }, "Load"),
-            S.status === "draft" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "submit") }, "Submit for review") : null,
-            S.status === "draft" ? h("button", { class: "btn btn-quiet", type: "button", title: "Set this draft aside. It is kept for the record but never used or credited to a run.", onclick: () => review(S, "discard") }, "Discard") : null,
-            S.status === "in_review" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "approve") }, "Approve") : null,
-            S.status === "in_review" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "return") }, "Return") : null,
-            S.status === "approved" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "retire") }, "Retire") : null))))))) : null,
+            S.status === "draft" && canDraft ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "submit") }, "Submit for review") : null,
+            S.status === "draft" && canDraft ? h("button", { class: "btn btn-quiet", type: "button", title: "Set this draft aside. It is kept for the record but never used or credited to a run.", onclick: () => review(S, "discard") }, "Discard") : null,
+            S.status === "in_review" && canReview && S.created_by !== myName() ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "approve") }, "Approve") : null,
+            S.status === "in_review" && canReview && S.created_by !== myName() ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "return") }, "Return") : null,
+            S.status === "approved" && canDraft ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "retire") }, "Retire") : null))))))) : null,
       actionHost,
       h("div", { class: "toolbar" },
         h("div", { class: "field field-grow" }, h("label", { for: "qs-name" }, "Set name"), nameIn),
         h("div", { class: "field" }, h("label", { for: "qs-author" }, "Your name"), authorIn),
         saveBtn),
-      h("p", { class: "toolbar-note" }, "Saving under an existing name updates its draft, or starts the next version after the last one was submitted. Names are recorded as given; user accounts are not set up yet.")));
+      h("p", { class: "toolbar-note" }, `Saving under an existing name updates its draft, or starts the next version after the last one was submitted. ${signedIn() ? "Names come from your sign-in." : "Names are recorded as given (local mode, nobody signed in)."}`)));
   };
 
   /* -------------------------------------------------- failure analysis */

@@ -3,7 +3,8 @@ import { memoryForm } from "./components/records.js";
 import { notice, pageHead } from "./components/ui.js";
 import { h, put, s } from "./lib/dom.js";
 import { href, main, refreshHealth, renderServiceStrip, state } from "./lib/state.js";
-import { ADMIN_ROUTES, isAdmin, session, setView } from "./lib/session.js";
+import { ADMIN_ROUTES, canAdmin, isAdmin, session, setView } from "./lib/session.js";
+import { auth, hasRole, initAuth, roleSummary, signIn, signOut, signedIn } from "./lib/auth.js";
 import { viewEvaluation } from "./views/evaluation.js";
 import { viewGraph } from "./views/graph.js";
 import { viewImport } from "./views/import.js";
@@ -16,6 +17,10 @@ import { viewSystem } from "./views/system.js";
 
 // AegisOps console — dependency-free single-page app served by the FastAPI API.
 // All data comes from the public /api/v1 routes; nothing is fabricated client-side.
+
+// Sign-in first (AUTH_MODE=oidc): finish a returning sign-in or go to the
+// provider. In local mode this returns at once.
+const authReady = await initAuth();
 
 /* ------------------------------------------------------------ router */
 
@@ -55,9 +60,12 @@ export async function render() {
   if (token !== renderToken) return;
   try {
     if (ADMIN_ROUTES.has(name) && !isAdmin()) {
-      put(main, pageHead(route.title), notice("info", "This page is for administrators",
-        "You're viewing AegisOps as a plant user. Switch the view back to administrator to open it.",
-        [h("button", { class: "btn", type: "button", onclick: () => { setView("admin"); syncView(); render(); } }, "Switch to administrator view")]));
+      put(main, pageHead(route.title), canAdmin()
+        ? notice("info", "This page is for administrators",
+          "You're viewing AegisOps as a plant user. Switch the view back to administrator to open it.",
+          [h("button", { class: "btn", type: "button", onclick: () => { setView("admin"); syncView(); render(); } }, "Switch to administrator view")])
+        : notice("info", "This page isn't available to your role",
+          `You're signed in as ${roleSummary()}. Ask an administrator for the engineer, reviewer or administrator role if you need it.`));
     } else {
       await route.view(params);
     }
@@ -106,12 +114,25 @@ syncDensity();
 
 const viewBtn = document.getElementById("view-toggle");
 function syncView() {
-  document.documentElement.dataset.view = session.view;
+  // A viewer gets the plant-user view whatever was last chosen in this browser.
+  document.documentElement.dataset.view = isAdmin() ? "admin" : "plant";
   viewBtn.setAttribute("aria-pressed", String(!isAdmin()));
-  const local = !sessionStorage.getItem("aegis-token");
-  document.getElementById("view-meta").textContent = isAdmin()
-    ? (local ? "Local mode: administrator view" : "Administrator view")
-    : "Plant-user view: administration hidden";
+  // Importing changes data: hide it from people whose role can't.
+  const imp = document.querySelector('.nav a[data-route="import"]')?.closest("li");
+  if (imp) imp.hidden = !hasRole("engineer", "admin");
+  viewBtn.hidden = !canAdmin();
+  const local = auth.mode === "local";
+  const who = signedIn() ? `${auth.user.display_name || auth.user.username} · ${roleSummary()}` : null;
+  document.getElementById("view-meta").textContent = who
+    ? `${who}${canAdmin() ? (isAdmin() ? " · administrator view" : " · plant-user view") : ""}`
+    : isAdmin()
+      ? (local ? "Local mode: administrator view" : "Administrator view")
+      : "Plant-user view: administration hidden";
+  let out = document.getElementById("sign-out");
+  if (signedIn() && !out) {
+    out = h("button", { id: "sign-out", class: "theme-toggle", type: "button", onclick: signOut }, "Sign out");
+    document.getElementById("view-meta").after(out);
+  }
 }
 viewBtn.addEventListener("click", () => {
   setView(isAdmin() ? "plant" : "admin");
@@ -151,5 +172,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-setInterval(() => { if (!document.hidden) refreshHealth(); }, 20000);
-render();
+if (authReady !== false) {
+  if (auth.error) {
+    put(main, pageHead("Sign in"), notice("crit", "Sign-in didn't complete", auth.error,
+      [h("button", { class: "btn btn-primary", type: "button", onclick: signIn }, "Sign in again")]));
+  } else {
+    setInterval(() => { if (!document.hidden) refreshHealth(); }, 20000);
+    render();
+  }
+}

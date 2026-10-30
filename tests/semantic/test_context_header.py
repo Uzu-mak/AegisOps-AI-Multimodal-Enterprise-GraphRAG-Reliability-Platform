@@ -13,6 +13,15 @@ def _mem(**kw):
     return SimpleNamespace(**base)
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _header_format(monkeypatch):
+    # These tests describe the context-header format; plain is the default.
+    monkeypatch.setenv("SEMANTIC_TEXT_FORMAT", "context-header-1")
+
+
 def text(m):
     return SemanticIndexingService(semantic_index=None, embedding_provider=None)._build_semantic_text(m)
 
@@ -59,3 +68,9 @@ def test_unknown_format_is_refused(monkeypatch):
     monkeypatch.setenv("SEMANTIC_TEXT_FORMAT", "fancy")
     with pytest.raises(ValueError):
         text(_mem())
+
+
+def test_plain_is_the_default(monkeypatch):
+    monkeypatch.delenv("SEMANTIC_TEXT_FORMAT", raising=False)
+    assert text(_mem(asset_id="ENG-2")) == "WO 7: Oil cooler leaking Removed and replaced oil cooler."
+

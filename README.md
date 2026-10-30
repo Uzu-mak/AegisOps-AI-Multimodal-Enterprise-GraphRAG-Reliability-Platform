@@ -414,6 +414,30 @@ Compose supplies service hostnames such as `postgres`, `qdrant`, and `neo4j` to 
 | `PROJECTION_RETRY_SECONDS` | `15` | After a failed connect, requests skip that store for this long instead of waiting on it again |
 | `OUTBOX_WORKER_POLL_SECONDS` | `2.0` | Idle poll interval for the projection worker |
 | `KAFKA_ENABLED` | `false` | Turn on the optional outbound Kafka stream (with the `integration` compose profile) |
+| `AUTH_MODE` | `local` | `local` (no sign-in, loopback only), `token` (static tokens in `AUTH_TOKENS_JSON`) or `oidc` (sign-in through an OpenID Connect provider) |
+| `OIDC_ISSUER` | Keycloak realm URL | Issuer in tokens, as the browser sees it |
+| `OIDC_CLIENT_ID` | `aegisops-console` | Console client; tokens must be issued for it (`aud` or `azp`) |
+| `OIDC_JWKS_URL` | Keycloak certs URL on the Docker network | Where the API fetches signing keys |
+| `OIDC_ROLES_CLAIM` | `realm_access.roles` | Dotted path to the role list in the token |
+
+### Sign-in
+
+With `AUTH_MODE=oidc`, people sign in at an OpenID Connect provider (authorization code with PKCE), and every API call carries their access token. The API verifies each token's signature against the provider's keys, and checks its issuer, audience and expiry.
+
+Roles come from the token:
+
+| Role | What it allows |
+| --- | --- |
+| `viewer` | Reads everything a plant user needs |
+| `engineer` | Investigates, records findings, imports, drafts and submits question sets |
+| `reviewer` | Approves or returns question sets, never their own |
+| `admin` | Everything, including users and system pages |
+
+Names on findings and question sets come from the sign-in, so they can't be typed. People who have signed in are listed at `GET /api/v1/auth/users` (administrators only).
+
+**Bundled Keycloak.** Set `AUTH_MODE=oidc` and `COMPOSE_PROFILES=auth` in `.env`, then run `docker compose up -d`. The realm, roles, console client and starter users are imported from `deploy/keycloak/` (see the README there).
+
+**Another provider** (Entra ID, Okta, Clerk). Set the `OIDC_*` variables in `.env`. No code changes are needed.
 
 ## Project map
 
