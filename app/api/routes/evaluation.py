@@ -36,6 +36,7 @@ from app.evaluation.runner import EvaluationRunner
 from app.graphrag.pipeline import GraphRAGPipeline
 from app.retrieval.models import RetrievalQuery
 from app.services.exceptions import MemoryNotFoundError
+from app.services.semantic_service import TEXT_FORMATS
 
 router = APIRouter(prefix="/api/v1", tags=["evaluation"])
 logger = logging.getLogger(__name__)
@@ -110,6 +111,18 @@ def run_evaluation(
     run = EvaluationRunner(retrieval_fn=retrieval_fn, run_name="console").evaluate(
         cases, [RetrievalMode(m) for m in runnable], k=request.k
     )
+
+    # How the searched vectors were built, counted in Qdrant (not assumed from
+    # settings), so runs before and after a search-text change can be told apart.
+    index_text = None
+    counts = getattr(semantic_index, "text_format_counts", None)
+    if counts is not None:
+        try:
+            index_text = counts(TEXT_FORMATS)
+        except Exception as exc:  # noqa: BLE001 - informative only
+            logger.warning("could not count text formats: %s", exc)
+    for m in run.per_mode:
+        run.per_mode[m]["index_text"] = index_text
 
     if "agentic" in run.per_mode:
         # Kept with the mode so saved runs record it: runs written from a

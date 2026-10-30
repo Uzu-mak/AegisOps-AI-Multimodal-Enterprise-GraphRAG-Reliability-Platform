@@ -1,6 +1,7 @@
 """SemanticIndexingService - orchestrates semantic indexing after PostgreSQL commits."""
 
 import logging
+import os
 from datetime import datetime
 from uuid import UUID
 
@@ -15,6 +16,17 @@ logger = logging.getLogger(__name__)
 # changes, then re-project (python -m app.outbox.projection_worker --reproject-all --only qdrant)
 # so stored vectors and the code agree.
 SEMANTIC_TEXT_VERSION = "context-header-1"
+# Formats that can be embedded. "plain" is title + content, as before the
+# context header; it exists so the header can be measured against it. Choose
+# with SEMANTIC_TEXT_FORMAT when re-projecting; queries are unaffected.
+TEXT_FORMATS = ("plain", SEMANTIC_TEXT_VERSION)
+
+
+def active_text_format() -> str:
+    value = os.getenv("SEMANTIC_TEXT_FORMAT", SEMANTIC_TEXT_VERSION)
+    if value not in TEXT_FORMATS:
+        raise ValueError(f"SEMANTIC_TEXT_FORMAT must be one of {', '.join(TEXT_FORMATS)}, not {value!r}")
+    return value
 
 _TYPE_WORDS = {
     "observation": "Observation", "incident": "Incident report", "diagnosis": "Diagnosis",
@@ -60,6 +72,8 @@ class SemanticIndexingService:
         # embedded alone ("REMOVED & REPLACED OIL COOLER") otherwise loses which
         # machine and incident it belongs to, and identical step texts from
         # different incidents collapse onto the same vector.
+        if active_text_format() == "plain":
+            return " ".join(p for p in (memory.title, memory.content) if p)
         kind = _TYPE_WORDS.get(str(memory.memory_type), str(memory.memory_type).replace("_", " ").capitalize())
         where = [f"asset {memory.asset_id}" if memory.asset_id else None,
                  f"component {memory.component_id}" if memory.component_id else None,
@@ -93,6 +107,7 @@ class SemanticIndexingService:
             created_at=memory.created_at,
             importance=float(memory.importance),
             confidence=float(memory.confidence),
+            text_format=active_text_format(),
         )
 
     def index_memory(self, memory: MemoryRecord) -> None:

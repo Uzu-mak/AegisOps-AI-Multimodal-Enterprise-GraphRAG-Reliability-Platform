@@ -6,7 +6,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointIdsList, PointStruct, VectorParams
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointIdsList, PointStruct, VectorParams
 
 from app.embeddings.provider import EmbeddingProvider
 from app.semantic.index import (
@@ -103,6 +103,16 @@ class QdrantSemanticIndex(SemanticMemoryIndex):
             raise SemanticIndexError(
                 f"Failed to index memory {memory_id}: {exc}"
             ) from exc
+
+    def text_format_counts(self, formats: tuple[str, ...]) -> dict[str, int]:
+        """How many stored vectors came from each embedded-text format ("unrecorded" = indexed before formats were recorded)."""
+        total = self.client.count(collection_name=self.collection_name, exact=True).count
+        out = {}
+        for f in formats:
+            out[f] = self.client.count(collection_name=self.collection_name, exact=True,
+                                       count_filter=Filter(must=[FieldCondition(key="text_format", match=MatchValue(value=f))])).count
+        out["unrecorded"] = max(0, total - sum(out.values()))
+        return {k: v for k, v in out.items() if v}
 
     def get_vector_record(self, memory_id: UUID) -> Optional[VectorRecord]:
         """

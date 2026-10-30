@@ -35,3 +35,27 @@ def test_weak_evidence_is_named_in_the_embedded_text():
 
 def test_records_with_no_text_still_index_nothing():
     assert text(_mem(title="", content="")) == ""
+
+
+def test_plain_format_can_be_selected_for_a_before_and_after_measurement(monkeypatch):
+    monkeypatch.setenv("SEMANTIC_TEXT_FORMAT", "plain")
+    assert text(_mem(asset_id="ENG-2")) == "WO 7: Oil cooler leaking Removed and replaced oil cooler."
+
+
+def test_vectors_record_the_format_that_built_them(monkeypatch):
+    import uuid
+    from datetime import datetime, timezone
+
+    m = _mem(id=uuid.uuid4(), status="active", facility_id=None, created_at=datetime.now(timezone.utc), importance=0.5, confidence=0.8)
+    svc = SemanticIndexingService(semantic_index=None, embedding_provider=None)
+    assert svc._build_vector_record(m).to_dict()["text_format"] == "context-header-1"
+    monkeypatch.setenv("SEMANTIC_TEXT_FORMAT", "plain")
+    assert svc._build_vector_record(m).to_dict()["text_format"] == "plain"
+
+
+def test_unknown_format_is_refused(monkeypatch):
+    import pytest
+
+    monkeypatch.setenv("SEMANTIC_TEXT_FORMAT", "fancy")
+    with pytest.raises(ValueError):
+        text(_mem())

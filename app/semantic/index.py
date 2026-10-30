@@ -17,6 +17,7 @@ class VectorRecord:
         created_at: datetime,
         importance: float,
         confidence: float,
+        text_format: Optional[str] = None,
     ):
         self.memory_id = memory_id
         self.memory_type = memory_type
@@ -27,6 +28,7 @@ class VectorRecord:
         self.created_at = created_at
         self.importance = importance
         self.confidence = confidence
+        self.text_format = text_format  # which embedded-text format produced the vector
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to Qdrant payload dict."""
@@ -40,6 +42,7 @@ class VectorRecord:
             "created_at": self.created_at.isoformat(),
             "importance": self.importance,
             "confidence": self.confidence,
+            **({"text_format": self.text_format} if self.text_format else {}),
         }
 
 

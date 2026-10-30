@@ -30,6 +30,17 @@ const NAME_KEY = "aegis-eval-name";
 const myName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
 const rememberName = (v) => { try { localStorage.setItem(NAME_KEY, v); } catch {} };
 
+// How the searched vectors were built, as counted in Qdrant at run time.
+// More than one format means a rebuild was in progress: not a clean measurement.
+const TEXT_FORMAT_LABEL = { plain: "Plain (title and text)", "context-header-1": "With context header", unrecorded: "Not recorded (older index)" };
+export function searchText(run) {
+  const it = Object.values(run.per_mode || {}).find((p) => p && p.index_text)?.index_text;
+  if (!it) return "Not recorded";
+  const keys = Object.keys(it);
+  return keys.length === 1 ? TEXT_FORMAT_LABEL[keys[0]] || keys[0]
+    : `Mixed: ${keys.map((k) => `${num(it[k])} ${(TEXT_FORMAT_LABEL[k] || k).toLowerCase()}`).join(", ")}`;
+}
+
 // Absence handling: did Investigation say "the records don't answer this"
 // when none do, and avoid saying it when one does? A lexical check on the
 // answer (app/evaluation/metrics.py is_abstention), shown with that caveat.
@@ -254,7 +265,7 @@ export async function viewEvaluation(params) {
         h("summary", null, "Run details"),
         h("dl", { class: "facts" },
           [["Run", shortId(res.run_id)], ["Started", fmtWhen(res.generated_at)], ["Modes", modesRun.map((m) => MODE_LABEL[m]).join(", ")],
-           ["Top k", String(k)], ["Embedding", res.embedding_model], ["Questions", String(n)]].map(([t, v]) => [h("dt", null, t), h("dd", null, v)])),
+           ["Top k", String(k)], ["Embedding", res.embedding_model], ["Search text", searchText(res)], ["Questions", String(n)]].map(([t, v]) => [h("dt", null, t), h("dd", null, v)])),
         h("div", { class: "page-actions" },
           h("button", { class: "btn", type: "button", onclick: () => download(`aegisops-run-${res.run_id}.json`, JSON.stringify({ cases: evalState.cases, ...res }, null, 2), "application/json") }, "Download run (JSON)"))),
     );
@@ -420,7 +431,11 @@ export async function viewEvaluation(params) {
           h("caption", null, `${evalState.cases.length} labelled question${evalState.cases.length === 1 ? "" : "s"}, saved in this browser and not yet reviewed`),
           h("thead", null, h("tr", null, h("th", { scope: "col" }, "Question"), h("th", { scope: "col" }, "Records a correct answer needs"), h("th", { scope: "col" }, h("span", { class: "visually-hidden" }, "Actions")))),
           h("tbody", null, evalState.cases.map((c, i) => h("tr", null,
-            h("td", null, c.question, leakedCase(c) ? h("span", { class: "row-tags" }, h("span", { class: "tag tag-warn" }, "Repeats a record title")) : null),
+            h("td", null, c.question,
+              leakedCase(c) || c.label_method === "assistant-proposed" ? h("span", { class: "row-tags" },
+                leakedCase(c) ? h("span", { class: "tag tag-warn" }, "Repeats a record title") : null,
+                c.label_method === "assistant-proposed" ? h("span", { class: "tag tag-trust is-caution", title: "Labels proposed by the assistant. Check them against the records before this set is approved." }, "Proposed labels: check") : null) : null,
+              c.note ? h("span", { class: "cell-sub" }, c.note) : null),
             h("td", null, c.noAnswer ? h("span", { class: "cell-sub" }, "None: no record answers this, so the assistant should say so")
               : h("ul", { class: "plain-list" }, c.expected.map((id) => h("li", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(id) }, titleOf(id)))))),
             h("td", { class: "num" }, h("button", { class: "btn btn-quiet", type: "button", onclick: () => { evalState.cases.splice(i, 1); saveEvalCases(); drawQuestions(); drawOverview(); } }, "Remove")))))))
@@ -447,7 +462,7 @@ export async function viewEvaluation(params) {
   // above stays in the browser; saving it creates a draft version, and a run
   // is tied to a set version when its questions and labels match exactly.
   const toServer = (c) => ({ question: c.question, expected_memory_ids: c.noAnswer ? [] : c.expected, anchor_memory_id: c.anchor || null,
-    expects_no_answer: !!c.noAnswer, labeling_method: c.label_method || "console" });
+    expects_no_answer: !!c.noAnswer, labeling_method: c.label_method || "console", note: c.note || null });
   let confirmLoad = null;
   const loadSet = async (summary) => {
     const unsaved = evalState.cases.length && !workingSet();
@@ -460,7 +475,7 @@ export async function viewEvaluation(params) {
     if (!r.ok) return toast(r.error, true);
     const S = r.data;
     evalState.cases = S.questions.map((q) => ({ question: q.question, expected: q.expected_memory_ids, anchor: q.anchor_memory_id,
-      noAnswer: q.expects_no_answer, leaked: q.leaked, label_method: q.labeling_method }));
+      noAnswer: q.expects_no_answer, leaked: q.leaked, label_method: q.labeling_method, note: q.note }));
     evalState.setRef = { id: S.id, name: S.name, version: S.version, status: S.status, hash: S.content_hash, modified: false };
     saveEvalCases({ keepSet: true });
     toast(`Loaded ${S.name} v${S.version} (${SET_STATUS[S.status][0].toLowerCase()})`);
@@ -499,7 +514,9 @@ export async function viewEvaluation(params) {
       const label = { submit: "Submit for review", approve: "Approve", return: "Return to author", retire: "Retire" }[action];
       put(actionHost, h("div", { class: "panel review-form" },
         h("p", null, h("strong", null, `${label}: ${S.name} v${S.version}`),
-          action === "approve" ? " Approve only after checking every question's labels against the records. You must not be the author." : ""),
+          action === "approve" ? " Approve only after checking every question's labels against the records. You must not be the author." : "",
+          action === "approve" && evalState.setRef?.id === S.id && evalState.cases.some((c) => c.label_method === "assistant-proposed")
+            ? " Its labels were proposed by the assistant: approving says you checked each one yourself." : ""),
         h("div", { class: "toolbar" },
           h("div", { class: "field" }, h("label", null, "Your name"), who),
           h("div", { class: "field field-grow" }, h("label", null, "Note"), note),
@@ -637,7 +654,9 @@ export async function viewEvaluation(params) {
       h("section", { class: "panel", "aria-labelledby": "cmp-runs" },
         h("div", { class: "panel-head" }, h("div", null,
           h("h2", { id: "cmp-runs" }, "What changed between these runs"),
-          h("p", null, `${fmtWhen(A.generated_at)} compared with ${fmtWhen(B.generated_at)}. Only questions asked in both runs are compared, question by question.`))),
+          h("p", null, `${fmtWhen(A.generated_at)} compared with ${fmtWhen(B.generated_at)}. Only questions asked in both runs are compared, question by question.`),
+          searchText(A) !== searchText(B) ? h("p", null, h("strong", null, "Search text changed: "), `${searchText(B)} → ${searchText(A)}.`) : null)),
+        [A, B].some((x) => searchText(x).startsWith("Mixed")) ? notice("warn", "One run searched a partly rebuilt index", "Vectors from different search-text formats were mixed, so differences can't be put down to either format. Rerun after the rebuild finishes.") : null,
         !pairs.length ? notice("info", "No questions in common", "These runs share no labelled questions, so there is nothing to compare question by question.") : null,
         h("div", { class: "table-wrap" }, h("table", null,
           h("thead", null, h("tr", null, ["Mode", "Questions in both", `Change in recall at ${k} (95% interval)`, "Better", "Worse", "Same"].map((c, i) => h("th", { scope: "col", class: i ? "num" : null }, c)))),
@@ -665,7 +684,7 @@ export async function viewEvaluation(params) {
     put(runsHost,
       h("div", { class: "table-wrap" }, h("table", null,
         h("caption", null, `${runs.length} saved run${runs.length === 1 ? "" : "s"}, newest first`),
-        h("thead", null, h("tr", null, ["Run", "Questions", "Modes", "Top k", "Embedding", "Best recall at k", "Evidence", ""].map((c) => h("th", { scope: "col" }, c)))),
+        h("thead", null, h("tr", null, ["Run", "Questions", "Modes", "Top k", "Embedding", "Search text", "Best recall at k", "Evidence", ""].map((c) => h("th", { scope: "col" }, c)))),
         h("tbody", null, runs.map((run, i) => {
           const best = bestOf(run);
           const strength = evidenceStrength({ n: run.question_count, semantic: !/fake|hashedterm/i.test(run.embedding_model || ""), ...setEvidence(run.question_set) });
@@ -676,6 +695,7 @@ export async function viewEvaluation(params) {
             h("td", null, (run.modes_run || []).map((m) => MODE_LABEL[m]).join(", ")),
             h("td", null, String(run.k)),
             h("td", null, String(run.embedding_model || "").replace(/\(.*\)$/, "")),
+            h("td", null, searchText(run)),
             h("td", null, best ? `${pct(best.recall)} (${MODE_LABEL[best.mode]})` : "—"),
             h("td", null, stateChip(strength.label, strength.sev)),
             h("td", null, h("div", { class: "row-actions" },
