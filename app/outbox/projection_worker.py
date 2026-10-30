@@ -107,6 +107,8 @@ def reproject_all(
     connections: ProjectionConnections,
     session_factory: Callable = SessionLocal,
     embedding_provider: Any = None,
+    only: Optional[str] = None,
+    progress: Optional[Callable[[str, int, int], None]] = None,
 ) -> dict[str, Any]:
     """
     Re-project every canonical record into Qdrant and Neo4j.
@@ -122,11 +124,15 @@ def reproject_all(
         ids = [str(i) for i in session.scalars(select(MemoryRecord.id)).all()]
     report: dict[str, Any] = {"records": len(ids)}
     for name, fn in (("qdrant", qdrant_fn), ("neo4j", neo4j_fn)):
+        if only and name != only:
+            continue
         done, errors = 0, []
         for memory_id in ids:
             try:
                 fn(memory_id, "project")
                 done += 1
+                if progress and done % 250 == 0:
+                    progress(name, done, len(ids))
             except ProjectionStoreUnavailable as exc:
                 errors = [str(exc)]
                 done = None
@@ -144,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
     parser = argparse.ArgumentParser(description="AegisOps outbox projection worker")
     parser.add_argument("--reproject-all", action="store_true",
                         help="Re-project every record once (e.g. after changing EMBEDDING_PROVIDER) and exit.")
+    parser.add_argument("--only", choices=["qdrant", "neo4j"], help="With --reproject-all: re-project one store only.")
     parser.add_argument("--retry-failed", action="store_true", help="Requeue failed projection jobs without changing canonical records")
     args = parser.parse_args(argv)
     if args.retry_failed:
@@ -158,7 +165,12 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
         logging.basicConfig(level=logging.WARNING)
         connections = get_connections()
         try:
-            print(json.dumps(reproject_all(connections), indent=2))
+            import sys
+
+            def show(store: str, done: int, total: int) -> None:
+                print(f"{store}: {done}/{total}", file=sys.stderr, flush=True)
+
+            print(json.dumps(reproject_all(connections, only=args.only, progress=show), indent=2))
         finally:
             connections.close_all()
         return 0

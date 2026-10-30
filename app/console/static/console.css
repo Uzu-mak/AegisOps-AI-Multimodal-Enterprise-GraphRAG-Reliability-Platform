@@ -1216,3 +1216,10 @@ pre.cmd { white-space: pre-wrap; word-break: break-all; }
   .tab-list, .no-print, .page-head, .run-form { display: none !important; }
   .summary-charts, .kpis { break-inside: avoid; }
 }
+.tag-trust { font-weight: 500; }
+.tag-trust.is-caution { background: var(--warn-soft); color: var(--warn); border-color: var(--warn-fill); }
+.lineage { margin-top: var(--space-4); border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.lineage > summary { cursor: pointer; font-weight: 600; }
+.lineage[open] > summary { margin-bottom: var(--space-3); }
+.review-form { border-color: var(--line-strong); }
+.review-form p { margin: 0 0 var(--space-3); }

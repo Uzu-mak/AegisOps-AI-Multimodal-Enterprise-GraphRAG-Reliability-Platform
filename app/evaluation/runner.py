@@ -15,6 +15,7 @@ from uuid import uuid4
 from app.evaluation.metrics import (
     citation_accuracy,
     groundedness_score,
+    is_abstention,
     mrr_at_k,
     percentile,
     recall_at_k,
@@ -92,6 +93,7 @@ class EvaluationRunner:
             case_id=case.case_id,
             question=case.question,
             mode=mode,
+            expects_no_answer=case.expects_no_answer,
         )
 
         try:
@@ -111,14 +113,18 @@ class EvaluationRunner:
             if answer is not None:
                 result.groundedness = groundedness_score(answer)
                 result.citation_accuracy = citation_accuracy(answer, len(retrieved_ids))
+                result.abstained = is_abstention(answer)
 
             # Success: at least one expected ID retrieved OR no expected IDs (open question)
-            result.success = (
-                result.recall_at_k > 0 or not case.expected_memory_ids
-            )
+            if case.expects_no_answer:
+                # Retrieval always returns something; only an answer can be right here.
+                result.success = bool(result.abstained) if answer is not None else True
+            else:
+                result.success = result.recall_at_k > 0 or not case.expected_memory_ids
             result.failure_category = (
-                FailureCategory.NO_FAILURE
-                if result.success
+                FailureCategory.NO_FAILURE if result.success
+                # Answered a question no record answers: the claim can't be supported.
+                else FailureCategory.UNSUPPORTED_CLAIM if case.expects_no_answer
                 else FailureCategory.RETRIEVAL_FAILURE
             )
 
@@ -170,6 +176,18 @@ class EvaluationRunner:
                 "citation_accuracy": mean([r.citation_accuracy for r in rows]),
                 "latency_p50_ms": percentile([r.total_latency_ms for r in rows], 50) if rows else None,
             }
+            answered = [r for r in rows if r.abstained is not None and r.error is None]
+            if answered:
+                no_answer = [r for r in answered if r.expects_no_answer]
+                answerable = [r for r in answered if r.labeled and not r.expects_no_answer]
+                run.per_mode[mode.value].update({
+                    # Said "the records don't answer this" when none do (higher is better).
+                    "no_answer_cases": len(no_answer),
+                    "abstention_rate": mean([1.0 if r.abstained else 0.0 for r in no_answer]),
+                    # Said so although a labelled record answers it (lower is better).
+                    "false_abstention_rate": mean([1.0 if r.abstained else 0.0 for r in answerable]),
+                    "abstentions": [{"question": r.question, "abstained": r.abstained, "expects_no_answer": r.expects_no_answer} for r in answered],
+                })
 
         # Failure taxonomy
         taxonomy: dict[str, int] = {}

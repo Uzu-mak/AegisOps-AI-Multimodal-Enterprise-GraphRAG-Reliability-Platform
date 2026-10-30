@@ -8,6 +8,20 @@ import { href, main, navLink, refreshHealth } from "../lib/state.js";
 
 // Maintenance history from the plant's CMMS (Maximo, SAP PM, ...). The same
 // API call previews (dry_run) and writes, so what is shown is what is written.
+// Write-side quality check: say before importing how many records carry
+// little evidence, so they are not mistaken for full explanations later.
+function qualityNote(flags, total) {
+  const f = flags || {};
+  const parts = [
+    f.administrative ? `${num(f.administrative)} administrative (billing or paperwork)` : null,
+    f.routine_check ? `${num(f.routine_check)} only say a check passed` : null,
+    f.truncated ? `${num(f.truncated)} have text cut off by the source system` : null,
+    f.no_asset ? `${num(f.no_asset)} have no asset` : null,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return h("p", { class: "toolbar-note" }, `Quality check on ${num(total)} work orders: ${parts.join("; ")}. They are imported and labelled, so answers treat them as weak evidence.`);
+}
+
 export async function viewImport() {
   const st = { csv: null, fileName: null, columnMap: {}, report: null };
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -120,6 +134,7 @@ export async function viewImport() {
           { label: "Unchanged", value: d.unchanged, note: "already imported; skipped" },
           { label: "Problems", value: d.errors + d.warnings, note: `${d.errors} rows skipped, ${d.warnings} warnings`, sev: d.errors ? "crit" : d.warnings ? "warn" : null },
         ]),
+        qualityNote(d.quality_flags, d.valid_work_orders),
         h("div", { class: "page-actions" }, importBtn)),
       h("section", { class: "panel", "aria-labelledby": "imp-map" },
         h("div", { class: "panel-head" }, h("h2", { id: "imp-map" }, "Column mapping"),

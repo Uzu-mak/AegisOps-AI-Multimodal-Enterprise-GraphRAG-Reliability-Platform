@@ -158,7 +158,7 @@ def test_create_memory_enqueues_projection_outbox_events(service):
     assert {row.event_type for row in rows} == {"MEMORY_CREATED"}
     assert len({row.event_id for row in rows}) == 1
     assert {row.memory_version for row in rows} == {1}
-    assert all(row.schema_version == 1 for row in rows)
+    assert all(row.schema_version == 2 for row in rows)  # v2 events carry the record snapshot
     assert all(row.kafka_published_at is None for row in rows)
 
 

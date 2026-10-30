@@ -44,6 +44,8 @@ class EvalCase:
     incident_id: Optional[str] = None
     # Starting record for investigation-mode cases, as engineers run them.
     anchor_memory_id: Optional[str] = None
+    # True for a question no record answers: the right behaviour is to say so.
+    expects_no_answer: bool = False
 
 
 @dataclass
@@ -62,6 +64,8 @@ class EvalCaseResult:
     groundedness: Optional[float] = None  # only for modes that produce an answer
     citation_accuracy: Optional[float] = None
     labeled: bool = True      # False when the case has no expected IDs
+    expects_no_answer: bool = False
+    abstained: Optional[bool] = None  # answer modes only: did the answer say the records don't answer it?
     retrieval_latency_ms: float = 0.0
     generation_latency_ms: float = 0.0
     total_latency_ms: float = 0.0

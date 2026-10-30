@@ -15,6 +15,9 @@ from app.api.schemas.memory import (
     SupersedeMemoryRequest,
 )
 from app.db.models.memory import MemoryRecord
+from app.db.session import SessionLocal
+from app.graphrag.context import trust_label
+from app.ingestion.quality import quality_flags
 from app.observability.metrics import metrics_collector
 from app.services.exceptions import (
     InvalidLifecycleTransitionError,
@@ -22,6 +25,7 @@ from app.services.exceptions import (
     MemoryConflictError,
     MemoryNotFoundError,
 )
+from app.services.lineage import record_lineage
 from app.services.memory_service import MemoryCreateData, MemoryService
 
 router = APIRouter(prefix="/api/v1", tags=["memories"])
@@ -49,6 +53,8 @@ def memory_to_response(record: MemoryRecord) -> MemoryResponse:
         access_roles=record.access_roles or [],
         metadata=record.memory_metadata,
         supersedes_memory_id=record.supersedes_memory_id,
+        quality_flags=quality_flags(record),
+        trust=trust_label(record),
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -122,6 +128,16 @@ def get_memory(
         return memory_to_response(record)
     except MemoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/memories/{memory_id}/lineage")
+def memory_lineage(memory_id: UUID) -> dict[str, Any]:
+    """Where a record came from, its versions, what it feeds, and whether it is indexed (read-only)."""
+    with SessionLocal() as session:
+        lineage = record_lineage(session, memory_id)
+    if lineage is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return lineage
 
 
 @router.get("/memories", response_model=MemoryListResponse)

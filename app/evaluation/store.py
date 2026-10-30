@@ -90,8 +90,29 @@ def _scope(stmt, tenant_id: Optional[str]):
 
 
 def list_runs(session: Session, *, tenant_id: Optional[str], limit: int = 50) -> list[dict[str, Any]]:
-    rows = session.execute(_scope(select(EvalRunRecord), tenant_id).order_by(EvalRunRecord.created_at.desc()).limit(limit)).scalars()
-    return [_summary(r) for r in rows]
+    rows = list(session.execute(_scope(select(EvalRunRecord), tenant_id).order_by(EvalRunRecord.created_at.desc()).limit(limit)).scalars())
+    out = [_summary(r) for r in rows]
+    _attach_question_sets(session, out, tenant_id)
+    return out
+
+
+def _attach_question_sets(session: Session, runs: list[dict[str, Any]], tenant_id: Optional[str]) -> None:
+    """Say which versioned question set each run measured, by content hash (None for ad hoc questions)."""
+    from app.evaluation.datasets import run_dataset_hash, sets_by_hash
+
+    if not runs:
+        return
+    ids = [UUID(r["run_id"]) for r in runs]
+    cases: dict[str, list[dict[str, Any]]] = {}
+    for run_id, question, expected, anchor in session.execute(
+            select(EvalCaseResultRecord.run_id, EvalCaseResultRecord.question, EvalCaseResultRecord.expected_memory_ids,
+                   EvalCaseResultRecord.anchor_memory_id).where(EvalCaseResultRecord.run_id.in_(ids))):
+        cases.setdefault(str(run_id), []).append({"question": question, "expected_memory_ids": expected, "anchor_memory_id": anchor})
+    hashes = {r["run_id"]: run_dataset_hash(cases.get(r["run_id"], [])) for r in runs}
+    found = sets_by_hash(session, set(hashes.values()), tenant_id=tenant_id)
+    for r in runs:
+        r["dataset_hash"] = hashes[r["run_id"]]
+        r["question_set"] = found.get(hashes[r["run_id"]])
 
 
 def get_run(session: Session, run_id: UUID, *, tenant_id: Optional[str]) -> Optional[dict[str, Any]]:
@@ -101,6 +122,7 @@ def get_run(session: Session, run_id: UUID, *, tenant_id: Optional[str]) -> Opti
     cases = session.execute(select(EvalCaseResultRecord).where(EvalCaseResultRecord.run_id == run.id).order_by(EvalCaseResultRecord.id)).scalars()
     out = _summary(run)
     out["cases"] = [{**{f: getattr(c, f) for f in CASE_FIELDS}, "expected_memory_ids": c.expected_memory_ids, "anchor_memory_id": c.anchor_memory_id} for c in cases]
+    _attach_question_sets(session, [out], tenant_id)
     return out
 
 

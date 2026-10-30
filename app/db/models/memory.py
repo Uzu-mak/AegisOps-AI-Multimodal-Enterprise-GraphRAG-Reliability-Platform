@@ -5,7 +5,6 @@ from enum import Enum
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     DateTime,
     ForeignKey,
@@ -15,7 +14,9 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+# PostgreSQL's ARRAY (not the generic one) provides .overlap(), which tenant
+# scoping uses for access_roles. The column type in the database is unchanged.
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base

@@ -78,7 +78,7 @@ def liveness():
 
 
 # Must equal the newest Alembic revision; tests/reliability/test_schema_revision.py checks it.
-EXPECTED_SCHEMA_REVISION = "20261029_0005"
+EXPECTED_SCHEMA_REVISION = "20261030_0006"
 
 
 @ app.get("/health")

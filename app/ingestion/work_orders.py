@@ -35,6 +35,7 @@ from typing import Any, Iterable, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.db.models.memory import MemoryType
+from app.ingestion.quality import RULES_VERSION as QUALITY_RULES_VERSION, compute_flags
 from app.services.memory_service import MemoryCreateData
 
 SOURCE_TYPE = "work_order"
@@ -402,6 +403,9 @@ def parse_work_orders(csv_text: str, options: Optional[ImportOptions] = None) ->
         )
         fp = fingerprint(data)
         data.memory_metadata["import"] = {"fingerprint": fp, "source_system": options.source_system, "file_name": options.file_name, "row": idx}
+        # Quality flags sit outside the fingerprint: re-importing the same file stays a no-op.
+        data.memory_metadata["quality"] = {"flags": compute_flags(content=data.content, asset_id=asset, source_type=SOURCE_TYPE, meta=data.memory_metadata),
+                                           "rules": QUALITY_RULES_VERSION}
         out.append(ParsedWorkOrder(row=idx, wo_number=wo, data=data, fingerprint=fp))
 
     if rows_read == 0:
@@ -472,6 +476,10 @@ def run_import(service: Any, csv_text: str, options: Optional[ImportOptions] = N
     assets = sorted({w.data.asset_id for w in parsed.work_orders if w.data.asset_id})
     facilities = sorted({w.data.facility_id for w in parsed.work_orders if w.data.facility_id})
     dates = sorted(w.data.observed_at for w in parsed.work_orders if w.data.observed_at)
+    quality: dict[str, int] = {}
+    for w in parsed.work_orders:
+        for f in w.data.memory_metadata.get("quality", {}).get("flags", []):
+            quality[f] = quality.get(f, 0) + 1
     by_class: dict[str, int] = {}
     for w in parsed.work_orders:
         c = w.data.memory_metadata["work_order"]["work_type_class"]
@@ -499,6 +507,7 @@ def run_import(service: Any, csv_text: str, options: Optional[ImportOptions] = N
         "facilities": facilities,
         "date_range": [dates[0].isoformat(), dates[-1].isoformat()] if dates else None,
         "work_type_classes": by_class,
+        "quality_flags": quality,
         "issues": [i.as_dict() for i in parsed.issues[:MAX_ISSUES_REPORTED]],
         "issues_truncated": max(0, len(parsed.issues) - MAX_ISSUES_REPORTED),
         "sample": [preview_record(w) for w in (plan.create + [w for _, w in plan.supersede])[:5]],

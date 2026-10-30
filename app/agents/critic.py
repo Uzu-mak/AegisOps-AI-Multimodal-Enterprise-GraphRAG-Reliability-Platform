@@ -17,6 +17,41 @@ from app.agents.state import CriticResult
 from app.graphrag.context import EvidenceItem
 
 
+_WORD = re.compile(r"[a-z0-9]+")
+_STOP = frozenset(
+    "the a an and or of to in on at for from with by was were is are be been this that these those it its "
+    "after before during then than which who what when where why how not no also into onto over under "
+    "record records memory evidence shows show showed according states stated found".split()
+)
+
+
+def _content_words(text: str) -> set[str]:
+    # Compare on 5-letter stems so "leaking"/"leak" and "seals"/"seal" match.
+    return {w[:5] for w in _WORD.findall((text or "").lower()) if len(w) >= 3 and w not in _STOP}
+
+
+def weak_citations(answer: str, evidence: list[EvidenceItem], *, min_overlap: float = 0.2) -> list[str]:
+    """Cited sentences that share under min_overlap of their content words with the records they cite."""
+    normalized = re.sub(
+        r"([.!?]+)(\s*)((?:\[Memory\s+\d+\][\s,;]*)+)",
+        lambda m: " " + m.group(3).strip() + m.group(1) + m.group(2),
+        answer or "",
+    )
+    weak: list[str] = []
+    for sent in re.split(r"(?<=[.!?])\s+", normalized):
+        refs = [int(r) for r in re.findall(r"\[Memory\s+(\d+)\]", sent)]
+        refs = [r for r in refs if 1 <= r <= len(evidence)]
+        if not refs:
+            continue
+        words = _content_words(re.sub(r"\[Memory\s+\d+\]", " ", sent))
+        if len(words) < 3:
+            continue
+        cited = set().union(*(_content_words(f"{evidence[r - 1].title} {evidence[r - 1].content}") for r in refs))
+        if len(words & cited) / len(words) < min_overlap:
+            weak.append(sent.strip()[:160])
+    return weak
+
+
 class RuleBasedCritic:
     """
     Validates GraphRAG or agent answers against evidence items.
@@ -93,4 +128,5 @@ class RuleBasedCritic:
             citations_valid=citations_valid,
             confidence=confidence,
             notes=f"Found {len(cited_refs)} citations; {len(invalid_citations)} invalid.",
+            weak_citations=weak_citations(answer, evidence)[:5],
         )

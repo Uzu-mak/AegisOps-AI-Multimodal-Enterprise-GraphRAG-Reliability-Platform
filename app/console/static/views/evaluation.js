@@ -20,6 +20,37 @@ const runDay = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime
 // Advanced. Everything here is exploratory: questions live in this browser
 // and aren't reviewed or versioned (see the Evaluation Control Center design).
 
+// Evidence strength inputs from the question set a run measured: only an
+// approved (human-reviewed) version lifts the "console questions" limit.
+export const setEvidence = (qs) => (qs && qs.status === "approved" ? { source: "reviewed", humanApproved: true } : { source: "console" });
+// The question-set version the working list was loaded from, while unedited.
+const workingSet = () => (evalState.setRef && !evalState.setRef.modified ? evalState.setRef : null);
+const SET_STATUS = { draft: ["Draft", "info"], in_review: ["In review", "warn"], approved: ["Approved", "normal"], retired: ["Retired", "muted"] };
+const NAME_KEY = "aegis-eval-name";
+const myName = () => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } };
+const rememberName = (v) => { try { localStorage.setItem(NAME_KEY, v); } catch {} };
+
+// Absence handling: did Investigation say "the records don't answer this"
+// when none do, and avoid saying it when one does? A lexical check on the
+// answer (app/evaluation/metrics.py is_abstention), shown with that caveat.
+function abstentionPanel(ag) {
+  if (!ag || !Array.isArray(ag.abstentions) || !ag.abstentions.length) return null;
+  const no = ag.abstentions.filter((a) => a.expects_no_answer);
+  const yes = ag.abstentions.filter((a) => !a.expects_no_answer);
+  const said = no.filter((a) => a.abstained).length;
+  const wrongly = yes.filter((a) => a.abstained).length;
+  const missed = no.filter((a) => !a.abstained);
+  return h("section", { class: "panel", "aria-labelledby": "ev-abst" },
+    h("div", { class: "panel-head" }, h("div", null,
+      h("h2", { id: "ev-abst" }, "Does Investigation admit when the records don't answer?"),
+      h("p", null, "Checked from the answer's wording, so treat it as a screen, not proof."))),
+    h("ul", { class: "summary-list" },
+      no.length ? h("li", null, `Said so for ${said} of ${no.length} question${no.length === 1 ? "" : "s"} no record answers.`)
+        : h("li", null, "No \u201cno record answers this\u201d questions yet. Add some under Questions and labels to test this."),
+      yes.length ? h("li", null, `Wrongly said so for ${wrongly} of ${yes.length} question${yes.length === 1 ? "" : "s"} a record does answer.`) : null,
+      ...missed.map((a) => h("li", null, `Answered anyway: \u201c${a.question}\u201d`))));
+}
+
 export const MODE_LABEL = { semantic: "Meaning", graph: "Relationships", hybrid: "Both", agentic: "Investigation" };
 const STANDARD = { modes: ["semantic", "graph", "hybrid", "agentic"], k: 10 };
 const RUN_KEY = "aegis-eval-last-run";
@@ -81,7 +112,7 @@ export async function viewEvaluation(params) {
     put(results, h("div", { class: "panel" }, h("p", null, `Running ${evalState.cases.length} question${evalState.cases.length === 1 ? "" : "s"} through ${use.map((m) => MODE_LABEL[m]).join(", ")}`), skeleton()));
     detail.select("overview");
     const r = await api("/evaluation/runs", { method: "POST", timeout: 120000, body: {
-      cases: evalState.cases.map((c, i) => ({ case_id: `q-${String(i + 1).padStart(3, "0")}`, question: c.question, expected_memory_ids: c.expected, anchor_memory_id: c.anchor || null })),
+      cases: evalState.cases.map((c, i) => ({ case_id: `q-${String(i + 1).padStart(3, "0")}`, question: c.question, expected_memory_ids: c.noAnswer ? [] : c.expected, anchor_memory_id: c.anchor || null, expects_no_answer: !!c.noAnswer })),
       modes: use, k } });
     busy(button, false);
     if (!r.ok) return put(results, notice("crit", "The evaluation didn't run", r.error));
@@ -90,6 +121,8 @@ export async function viewEvaluation(params) {
     drawOverview();
     drawFailures();
     await loadHistory();
+    const saved = history.runs.find((x) => x.run_id === r.data.run_id);
+    if (saved) { evalState.results.question_set = saved.question_set; saveLastRun(evalState.results); drawOverview(); }
     drawRuns();
     drawSummary();
     if (!r.data.persisted) toast("This run wasn't saved to history (only writers and administrators save runs, or the history store is unavailable).", true);
@@ -103,7 +136,7 @@ export async function viewEvaluation(params) {
     const k = res.k;
     const pm = res.per_mode || {};
     const modesRun = res.modes_run || [];
-    const questions = [...new Set((res.cases || []).map((c) => c.question))];
+    const questions = [...new Set((res.cases || []).filter((c) => c.labeled !== false).map((c) => c.question))];
     const n = questions.length;
     const semantic = !/fake|hashedterm/i.test(res.embedding_model || "");
     const unavailable = Object.entries(res.unavailable_modes || {});
@@ -128,7 +161,7 @@ export async function viewEvaluation(params) {
     const range = (c) => (!c ? "—" : c.lo === null ? `${pct(c.mean)}, no interval` : `${pct(c.mean)} (${pct(c.lo)} to ${pct(c.hi)})`);
     const caseFor = (q) => evalState.cases.find((c) => c.question === q);
     const leakedQs = questions.filter((q) => { const c = caseFor(q); return c ? leakedCase(c) : false; }).length;
-    const strength = evidenceStrength({ n, semantic, source: "console", leaked: leakedQs });
+    const strength = evidenceStrength({ n, semantic, leaked: leakedQs, ...setEvidence(res.question_set) });
 
     const metricChart = h("section", { class: "panel viz", "aria-labelledby": "ev-metrics" },
       h("div", { class: "panel-head" }, h("div", null,
@@ -206,6 +239,7 @@ export async function viewEvaluation(params) {
         `Recall at ${k} is nearly guaranteed on a collection this small. Read Recall at 5 and MRR (how high the answer ranks) instead, or import the plant's work-order history for a meaningful test.`,
         [navLink("Import work orders", "import", {}, "btn")]) : null,
       unavailable.length ? notice("warn", "Some modes didn't run", unavailable.map(([m, why]) => `${MODE_LABEL[m]}: ${why}.`).join(" ") + " They are reported as not measured, not as zero.", [navLink("Open System health", "system", {}, "btn")]) : null,
+      abstentionPanel(pm.agentic),
       h("dl", { class: "readouts" },
         tile("Evidence strength", strength.label, `${strength.why.join("; ")}. Use for: ${strength.level === "exploratory" ? "debugging only" : strength.level === "indicative" ? "internal comparison" : "gates and reports"}.`, strength.level === "exploratory" ? "warn" : null),
         tile("Labelled questions", num(n), `Scored at top ${k}${n ? `; one question moves recall ${Math.round(100 / n)} points` : ""}`),
@@ -230,12 +264,12 @@ export async function viewEvaluation(params) {
   /* ---------------------------------------------------------- overview */
 
   const drawOverview = () => {
-    const cases = evalState.cases;
+    const cases = evalState.cases.filter((c) => !c.noAnswer);
     const n = cases.length;
     const leaked = cases.filter(leakedCase).length;
     const emb = state.health?.embedding_provider;
     const semantic = emb ? emb.semantic !== false : true;
-    const strength = evidenceStrength({ n, semantic, source: "console", leaked });
+    const strength = evidenceStrength({ n, semantic, leaked, ...setEvidence(workingSet()) });
     const records = new Set(cases.flatMap((c) => c.expected)).size;
     const runBtn = h("button", { class: "btn", type: "button", disabled: !n, onclick: (e) => runEvaluation(e.currentTarget, STANDARD) }, "Run standard evaluation");
 
@@ -320,11 +354,11 @@ export async function viewEvaluation(params) {
     };
   };
 
-  const addCase = ({ question, ids, anchor = null }) => {
-    const v = leakage(question, ids.map(titleOf));
-    evalState.cases.push({ question, expected: ids, anchor, leaked: v.leaked, label_method: "console", added_at: new Date().toISOString() });
+  const addCase = ({ question, ids, anchor = null, noAnswer = false }) => {
+    const v = noAnswer ? { leaked: false } : leakage(question, ids.map(titleOf));
+    evalState.cases.push({ question, expected: noAnswer ? [] : ids, anchor, noAnswer, leaked: v.leaked, label_method: "console", added_at: new Date().toISOString() });
     saveEvalCases();
-    toast(v.leaked ? "Question added, flagged as repeating a record title" : "Question added");
+    toast(noAnswer ? "Question added: no record answers it, so the right answer is to say so" : v.leaked ? "Question added, flagged as repeating a record title" : "Question added");
     drawQuestions();
     drawOverview();
   };
@@ -347,6 +381,11 @@ export async function viewEvaluation(params) {
             evalState.pending = null;
             addCase({ question: p.question, ids, anchor: p.anchor || null });
           } }, "Add labelled question"),
+          h("button", { class: "btn", type: "button", onclick: () => {
+            if (picker.chosen().length) return toast("Untick the records first: a no-answer question has none", true);
+            evalState.pending = null;
+            addCase({ question: p.question, ids: [], anchor: p.anchor || null, noAnswer: true });
+          } }, "No record answers this"),
           h("button", { class: "btn", type: "button", onclick: () => { evalState.pending = null; drawQuestions(); } }, "Discard")));
     }
 
@@ -369,6 +408,10 @@ export async function viewEvaluation(params) {
           if (!ids.length) return toast("Tick at least one record a correct answer needs", true);
           addCase({ question, ids });
         } }, "Add labelled question"),
+        h("button", { class: "btn", type: "button", title: "Use this when you checked and no record answers the question. The assistant should then say it can't answer.", onclick: () => {
+          if (picker.chosen().length) return toast("Untick the records first: a no-answer question has none", true);
+          addCase({ question, ids: [], noAnswer: true });
+        } }, "No record answers this"),
         h("button", { class: "btn", type: "button", onclick: () => { put(pickerHost); picker = null; } }, "Cancel")));
     } }, "Find candidate records");
 
@@ -378,19 +421,127 @@ export async function viewEvaluation(params) {
           h("thead", null, h("tr", null, h("th", { scope: "col" }, "Question"), h("th", { scope: "col" }, "Records a correct answer needs"), h("th", { scope: "col" }, h("span", { class: "visually-hidden" }, "Actions")))),
           h("tbody", null, evalState.cases.map((c, i) => h("tr", null,
             h("td", null, c.question, leakedCase(c) ? h("span", { class: "row-tags" }, h("span", { class: "tag tag-warn" }, "Repeats a record title")) : null),
-            h("td", null, h("ul", { class: "plain-list" }, c.expected.map((id) => h("li", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(id) }, titleOf(id)))))),
+            h("td", null, c.noAnswer ? h("span", { class: "cell-sub" }, "None: no record answers this, so the assistant should say so")
+              : h("ul", { class: "plain-list" }, c.expected.map((id) => h("li", null, h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(id) }, titleOf(id)))))),
             h("td", { class: "num" }, h("button", { class: "btn btn-quiet", type: "button", onclick: () => { evalState.cases.splice(i, 1); saveEvalCases(); drawQuestions(); drawOverview(); } }, "Remove")))))))
       : empty("No labelled questions yet", "Add one above, or use Add to benchmark from an investigation.");
 
+    const setsHost = h("div", { class: "stack" });
+    drawSets(setsHost);
+
     put(questionsHost,
       pendingEl,
+      setsHost,
       h("section", { class: "panel", "aria-labelledby": "add-title" },
         h("div", { class: "panel-head" }, h("div", null, h("h2", { id: "add-title" }, "Add a question"),
           h("p", null, "Ask it the way an engineer would, without copying a record's title. AegisOps then pools candidate records for you to judge."))),
         h("div", { class: "toolbar" }, h("div", { class: "field field-grow" }, h("label", { for: "e-q" }, "Question"), qInput), findBtn),
         qHint, pickerHost),
       list,
-      notice("info", "Questions are saved in this browser only", "They aren't shared with other people or devices, and clearing site data removes them. Export them under Advanced to keep them with the project."));
+      notice("info", "The working list is kept in this browser", "Save it as a question set to version it, share it and have it reviewed. Only an approved set counts as reviewed evidence."));
+  };
+
+  /* ------------------------------------------- versioned question sets */
+
+  // Server-side, versioned question sets with a review step. The working list
+  // above stays in the browser; saving it creates a draft version, and a run
+  // is tied to a set version when its questions and labels match exactly.
+  const toServer = (c) => ({ question: c.question, expected_memory_ids: c.noAnswer ? [] : c.expected, anchor_memory_id: c.anchor || null,
+    expects_no_answer: !!c.noAnswer, labeling_method: c.label_method || "console" });
+  let confirmLoad = null;
+  const loadSet = async (summary) => {
+    const unsaved = evalState.cases.length && !workingSet();
+    if (unsaved && confirmLoad !== summary.id) {
+      confirmLoad = summary.id;
+      return toast(`The working list has ${evalState.cases.length} unsaved question${evalState.cases.length === 1 ? "" : "s"}. Save it as a set first, or select Load again to replace it.`, true);
+    }
+    confirmLoad = null;
+    const r = await api(`/evaluation/question-sets/${summary.id}`);
+    if (!r.ok) return toast(r.error, true);
+    const S = r.data;
+    evalState.cases = S.questions.map((q) => ({ question: q.question, expected: q.expected_memory_ids, anchor: q.anchor_memory_id,
+      noAnswer: q.expects_no_answer, leaked: q.leaked, label_method: q.labeling_method }));
+    evalState.setRef = { id: S.id, name: S.name, version: S.version, status: S.status, hash: S.content_hash, modified: false };
+    saveEvalCases({ keepSet: true });
+    toast(`Loaded ${S.name} v${S.version} (${SET_STATUS[S.status][0].toLowerCase()})`);
+    drawQuestions(); drawOverview();
+  };
+
+  const drawSets = async (host) => {
+    put(host, h("div", { class: "panel" }, skeleton()));
+    const r = await api("/evaluation/question-sets");
+    if (!r.ok) return put(host, notice("warn", "Question sets are unavailable", `${r.error}. If the API was just updated, apply the database migration (alembic upgrade head).`));
+    const sets = r.data.sets || [];
+    const ws = evalState.setRef;
+    const nameIn = h("input", { type: "text", id: "qs-name", autocomplete: "off", value: ws?.name || "", placeholder: "e.g. MaintNet engines" });
+    const authorIn = h("input", { type: "text", id: "qs-author", autocomplete: "name", value: myName(), placeholder: "Your name" });
+    const actionHost = h("div");
+    const saveBtn = h("button", { class: "btn btn-primary", type: "button", disabled: !evalState.cases.length, onclick: async (e) => {
+      const name = nameIn.value.trim(), author = authorIn.value.trim();
+      if (!name || !author) return toast("Give the set a name and say who you are", true);
+      rememberName(author);
+      const draft = sets.find((x) => x.name === name && x.status === "draft");
+      busy(e.currentTarget, true);
+      const res = draft
+        ? await api(`/evaluation/question-sets/${draft.id}/questions`, { method: "PUT", body: { questions: evalState.cases.map(toServer) } })
+        : await api("/evaluation/question-sets", { method: "POST", body: { name, author, questions: evalState.cases.map(toServer) } });
+      busy(e.currentTarget, false);
+      if (!res.ok) return toast(res.error, true);
+      evalState.setRef = { id: res.data.id, name: res.data.name, version: res.data.version, status: res.data.status, hash: res.data.content_hash, modified: false };
+      saveEvalCases({ keepSet: true });
+      toast(draft ? `Updated draft ${name} v${res.data.version}` : `Saved ${name} v${res.data.version} as a draft`);
+      drawQuestions(); drawOverview();
+    } }, "Save working list as a set");
+
+    const review = (S, action) => {
+      const who = h("input", { type: "text", autocomplete: "name", value: action === "submit" ? myName() : "", "aria-label": "Your name" });
+      const note = h("input", { type: "text", "aria-label": "Note", placeholder: action === "return" ? "What needs changing" : "Optional note" });
+      const label = { submit: "Submit for review", approve: "Approve", return: "Return to author", retire: "Retire" }[action];
+      put(actionHost, h("div", { class: "panel review-form" },
+        h("p", null, h("strong", null, `${label}: ${S.name} v${S.version}`),
+          action === "approve" ? " Approve only after checking every question's labels against the records. You must not be the author." : ""),
+        h("div", { class: "toolbar" },
+          h("div", { class: "field" }, h("label", null, "Your name"), who),
+          h("div", { class: "field field-grow" }, h("label", null, "Note"), note),
+          h("button", { class: "btn btn-primary", type: "button", onclick: async (e) => {
+            if (!who.value.trim()) return toast("Say who you are", true);
+            busy(e.currentTarget, true);
+            const res = await api(`/evaluation/question-sets/${S.id}/${action}`, { method: "POST", body: { by: who.value.trim(), note: note.value.trim() || null } });
+            busy(e.currentTarget, false);
+            if (!res.ok) return toast(res.error, true);
+            if (action === "submit") rememberName(who.value.trim());
+            if (evalState.setRef?.id === S.id) { evalState.setRef = { ...evalState.setRef, status: res.data.status }; saveEvalCases({ keepSet: true }); }
+            toast(`${S.name} v${S.version} is now ${SET_STATUS[res.data.status][0].toLowerCase()}`);
+            drawQuestions(); drawOverview();
+          } }, label),
+          h("button", { class: "btn", type: "button", onclick: () => put(actionHost) }, "Cancel"))));
+    };
+
+    put(host, h("section", { class: "panel", "aria-labelledby": "qs-title" },
+      h("div", { class: "panel-head" }, h("div", null,
+        h("h2", { id: "qs-title" }, "Question sets"),
+        h("p", null, "Versioned and reviewed. Draft → in review → approved; approved versions are frozen, and changes make a new version."))),
+      ws ? h("p", { class: "toolbar-note" }, `Working list: ${ws.name} v${ws.version} (${SET_STATUS[ws.status]?.[0].toLowerCase() || ws.status})${ws.modified ? ", edited since loading, so runs won't count as that version" : ""}.`) : null,
+      sets.length ? h("div", { class: "table-wrap" }, h("table", null,
+        h("thead", null, h("tr", null, ["Set", "Status", "Questions", "Author", "Reviewed by", ""].map((c) => h("th", { scope: "col" }, c)))),
+        h("tbody", null, sets.map((S) => h("tr", null,
+          h("td", null, h("span", { class: "cell-title" }, `${S.name} v${S.version}`), h("span", { class: "cell-sub" }, `#${S.content_hash.slice(0, 8)}`)),
+          h("td", null, stateChip(...(SET_STATUS[S.status] || [S.status, "info"])), S.review_note ? h("span", { class: "cell-sub" }, S.review_note) : null),
+          h("td", null, num(S.question_count)),
+          h("td", null, S.created_by),
+          h("td", null, S.reviewed_by ? `${S.reviewed_by}, ${fmtWhen(S.reviewed_at)}` : "—"),
+          h("td", null, h("div", { class: "row-actions" },
+            h("button", { class: "btn btn-quiet", type: "button", onclick: () => loadSet(S) }, "Load"),
+            S.status === "draft" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "submit") }, "Submit for review") : null,
+            S.status === "in_review" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "approve") }, "Approve") : null,
+            S.status === "in_review" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "return") }, "Return") : null,
+            S.status === "approved" ? h("button", { class: "btn btn-quiet", type: "button", onclick: () => review(S, "retire") }, "Retire") : null))))))) : null,
+      actionHost,
+      h("div", { class: "toolbar" },
+        h("div", { class: "field field-grow" }, h("label", { for: "qs-name" }, "Set name"), nameIn),
+        h("div", { class: "field" }, h("label", { for: "qs-author" }, "Your name"), authorIn),
+        saveBtn),
+      h("p", { class: "toolbar-note" }, "Saving under an existing name updates its draft, or starts the next version after the last one was submitted. Names are recorded as given; user accounts are not set up yet.")));
   };
 
   /* -------------------------------------------------- failure analysis */
@@ -447,7 +598,9 @@ export async function viewEvaluation(params) {
     const m = (run.modes_run || []).filter((x) => typeof pm[x]?.recall_at_k === "number").sort((a, b) => pm[b].recall_at_k - pm[a].recall_at_k).at(0);
     return m ? { mode: m, recall: pm[m].recall_at_k, mrr: pm[m].mrr } : null;
   };
-  const comparable = (a, b) => a.k === b.k && a.embedding_model === b.embedding_model;
+  // Investigation runs written from a different number of records are not comparable.
+  const comparable = (a, b) => a.k === b.k && a.embedding_model === b.embedding_model
+    && (a.per_mode?.agentic?.context_limit ?? null) === (b.per_mode?.agentic?.context_limit ?? null);
 
   const openRun = async (summary) => {
     put(runDetail, h("div", { class: "panel" }, skeleton()));
@@ -515,7 +668,7 @@ export async function viewEvaluation(params) {
         h("thead", null, h("tr", null, ["Run", "Questions", "Modes", "Top k", "Embedding", "Best recall at k", "Evidence", ""].map((c) => h("th", { scope: "col" }, c)))),
         h("tbody", null, runs.map((run, i) => {
           const best = bestOf(run);
-          const strength = evidenceStrength({ n: run.question_count, semantic: !/fake|hashedterm/i.test(run.embedding_model || ""), source: run.source || "console" });
+          const strength = evidenceStrength({ n: run.question_count, semantic: !/fake|hashedterm/i.test(run.embedding_model || ""), ...setEvidence(run.question_set) });
           const prev = runs.slice(i + 1).find((o) => comparable(run, o));
           return h("tr", null,
             h("td", null, h("span", { class: "cell-title" }, fmtWhen(run.generated_at)), h("span", { class: "cell-sub" }, `${run.source || "console"}, ${shortId(run.run_id)}`)),

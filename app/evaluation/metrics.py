@@ -18,6 +18,21 @@ _CITATION = re.compile(r"\[Memory\s+(\d+)\]")
 _TRAILING_CITATIONS = re.compile(r"([.!?]+)(\s*)((?:\[Memory\s+\d+\][\s,;]*)+)")
 
 
+# Phrases an answer uses to say the records don't answer the question. A
+# lexical check: it detects that the answer *says* so, not that it is right to.
+_ABSTAIN = re.compile(
+    r"\b(insufficient|not enough (?:information|evidence)|no (?:relevant |matching |operational )?(?:records?|evidence|information)"
+    r"|(?:does|do|did) not (?:contain|mention|include|provide|say|show|record|describe)|(?:cannot|can't|unable to) (?:be )?(?:determine|answer|tell|confirm|find)"
+    r"|not (?:stated|recorded|documented|mentioned) in the (?:records|evidence))\b",
+    re.IGNORECASE,
+)
+
+
+def is_abstention(answer: str) -> bool:
+    """True when the answer says the evidence does not answer the question."""
+    return bool(_ABSTAIN.search(answer or ""))
+
+
 def _attach_trailing_citations(answer: str) -> str:
     return _TRAILING_CITATIONS.sub(lambda m: " " + m.group(3).strip() + m.group(1) + m.group(2), answer or "")
 

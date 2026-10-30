@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.db.base import Base
 from app.db.models.memory import MemoryRecord
 from app.outbox.models import ProjectionOutboxEvent  # noqa: F401 — registers with Base
+from app.evaluation.datasets import EvalQuestionRecord, EvalQuestionSetRecord  # noqa: F401 — registers with Base
 from app.evaluation.store import EvalCaseResultRecord, EvalRunRecord  # noqa: F401 — registers with Base
 
 settings = get_settings()

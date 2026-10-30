@@ -6,9 +6,22 @@ from uuid import UUID
 
 from app.db.models.memory import MemoryRecord
 from app.embeddings.provider import EmbeddingProvider
+from app.ingestion.quality import quality_flags
 from app.semantic.index import SemanticIndexError, SemanticMemoryIndex, VectorRecord
 
 logger = logging.getLogger(__name__)
+
+# Version of the text that is embedded. Bump it when _build_semantic_text
+# changes, then re-project (python -m app.outbox.projection_worker --reproject-all --only qdrant)
+# so stored vectors and the code agree.
+SEMANTIC_TEXT_VERSION = "context-header-1"
+
+_TYPE_WORDS = {
+    "observation": "Observation", "incident": "Incident report", "diagnosis": "Diagnosis",
+    "maintenance_action": "Maintenance action", "resolution": "Resolution", "recommendation": "Recommendation",
+    "document_fact": "Document fact", "agent_interaction": "Assistant interaction", "feedback": "Feedback",
+}
+_QUALITY_WORDS = {"administrative": "administrative entry", "routine_check": "routine check result"}
 
 
 class SemanticIndexingService:
@@ -43,12 +56,22 @@ class SemanticIndexingService:
         Returns:
             Combined text for embedding
         """
-        parts = []
+        # A context header keeps each record self-contained: a repair step
+        # embedded alone ("REMOVED & REPLACED OIL COOLER") otherwise loses which
+        # machine and incident it belongs to, and identical step texts from
+        # different incidents collapse onto the same vector.
+        kind = _TYPE_WORDS.get(str(memory.memory_type), str(memory.memory_type).replace("_", " ").capitalize())
+        where = [f"asset {memory.asset_id}" if memory.asset_id else None,
+                 f"component {memory.component_id}" if memory.component_id else None,
+                 f"incident {memory.incident_id}" if memory.incident_id else None]
+        notes = [_QUALITY_WORDS[f] for f in quality_flags(memory) if f in _QUALITY_WORDS]
+        header = kind + (f" on {', '.join(w for w in where if w)}" if any(where) else "") + (f" ({'; '.join(notes)})" if notes else "") + "."
+        parts = [header]
         if memory.title:
             parts.append(memory.title)
         if memory.content:
             parts.append(memory.content)
-        return " ".join(parts)
+        return " ".join(parts) if (memory.title or memory.content) else ""
 
     def _build_vector_record(self, memory: MemoryRecord) -> VectorRecord:
         """

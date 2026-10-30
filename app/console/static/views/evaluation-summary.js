@@ -7,7 +7,7 @@ import { groupedBars, legend, lineTrend, withTooltip } from "../components/chart
 import { evidenceStrength } from "../lib/evalmath.js";
 import { api } from "../lib/api.js";
 import { h, put } from "../lib/dom.js";
-import { MODE_LABEL } from "./evaluation.js";
+import { MODE_LABEL, setEvidence } from "./evaluation.js";
 
 // Working targets for this pilot. They are a starting point to agree with the
 // plant, not an industry standard; the page says so next to every status.
@@ -16,7 +16,8 @@ const ANSWER_CONTEXT = 5; // the answer writer reads the top 5 records (GraphRAG
 
 const labelledQuestions = (run, mode) => run.cases.filter((c) => c.mode === mode && c.labeled !== false);
 const questionSet = (run) => [...new Set(run.cases.filter((c) => c.labeled !== false).map((c) => c.question))].sort().join("\u0000");
-const comparable = (a, b) => a.k === b.k && a.embedding_model === b.embedding_model;
+const comparable = (a, b) => a.k === b.k && a.embedding_model === b.embedding_model
+  && (a.per_mode?.agentic?.context_limit ?? null) === (b.per_mode?.agentic?.context_limit ?? null);
 const primaryMode = (run) => ["agentic", "hybrid", "semantic", "graph"].find((m) => (run.modes_run || []).includes(m));
 const status = (v, target, higherIsBetter = true) => {
   if (typeof v !== "number") return stateChip("Not measured", "info");
@@ -74,13 +75,22 @@ export async function managerSummary(host, { latest, history, items }) {
   const expected = new Set(rows.flatMap((c) => c.expected_memory_ids || []));
   const incidents = new Set([...expected].map((id) => byId.get(id)?.incident_id).filter(Boolean));
   const assets = new Set([...expected].map((id) => byId.get(id)?.asset_id).filter(Boolean));
+  const plural = (k, word) => `${k} ${word}${k === 1 ? "" : "s"}`;
+  const coverage = !incidents.size && !assets.size
+    ? `${plural(expected.size, "labelled record")}, not linked to incidents or assets.`
+    : `${plural(incidents.size, "incident")} and ${plural(assets.size, "asset")} covered.`;
   const semantic = !/fake|hashedterm/i.test(latest.embedding_model || "");
-  const strength = evidenceStrength({ n, semantic, source: latest.source || "console" });
+  const strength = evidenceStrength({ n, semantic, ...setEvidence(latest.question_set) });
 
   const facts = [
     `For ${hits5} of ${n} test question${n === 1 ? "" : "s"}, the right maintenance record was among the ${ANSWER_CONTEXT} records the assistant reads before it answers.`,
     missedAll ? `${missedAll} question${missedAll === 1 ? " was" : "s were"} not answered with the right record even in the top ${latest.k}: see Failure analysis.` : `Every question had a right record somewhere in the top ${latest.k}.`,
     sem.size && gr.size && hyb.size ? (rescued ? `Combining the two search methods recovered ${rescued} question${rescued === 1 ? "" : "s"} that one method alone missed.` : "Combining the two search methods did not recover any question that one method alone missed in this run.") : null,
+    (() => {
+      const ab = pm.agentic?.abstentions || [];
+      const no = ab.filter((a) => a.expects_no_answer);
+      return no.length ? `When no record answered the question, the assistant said so ${no.filter((a) => a.abstained).length} of ${no.length} times instead of guessing.` : null;
+    })(),
     secs !== null && fastest ? `A full investigation takes about ${secs.toFixed(1)} s per question, ${Math.round(pm[mode].latency_p50_ms / pm[fastest].latency_p50_ms)}× a plain search, because it writes an answer as well.` : null,
   ].filter(Boolean);
 
@@ -117,7 +127,7 @@ export async function managerSummary(host, { latest, history, items }) {
         tile({ label: "Time to an answer", value: secs === null ? "—" : `${secs.toFixed(1)} s`, chip: status(secs, TARGETS.seconds, false),
           note: `Typical (median) per question. Working target under ${TARGETS.seconds} s.` }),
         tile({ label: "How much to trust these numbers", value: strength.label, chip: stateChip(`${n} question${n === 1 ? "" : "s"}`, strength.sev),
-          note: `${incidents.size || "No"} incident${incidents.size === 1 ? "" : "s"} and ${assets.size || "no"} asset${assets.size === 1 ? "" : "s"} covered. ${strength.level === "decision" ? "" : "Not yet enough for a decision."}` })),
+          note: `${coverage}${strength.level === "decision" ? "" : " Not yet enough for a decision."}` })),
       h("div", { class: "summary-charts" },
         h("figure", { class: "summary-fig viz" }, h("figcaption", null, h("strong", null, "Which search method finds the evidence"), h("span", null, "Longer bars are better.")), bars),
         h("figure", { class: "summary-fig viz" }, h("figcaption", null, h("strong", null, "Is it getting better?"), h("span", null, `${MODE_LABEL[mode]}, right evidence in the first ${ANSWER_CONTEXT}, runs measured the same way.`)), trend)),
@@ -125,7 +135,8 @@ export async function managerSummary(host, { latest, history, items }) {
         h("div", null, h("h3", null, "What this means"), h("ul", { class: "summary-list" }, facts.slice(1).map((f) => h("li", null, f)))),
         h("div", null, h("h3", null, "Before relying on it"), h("ul", { class: "summary-list" },
           strength.why.map((w) => h("li", null, w[0].toUpperCase() + w.slice(1) + ".")),
-          incidents.size < 5 ? h("li", null, `The questions cover ${incidents.size || "no"} incident${incidents.size === 1 ? "" : "s"}; a fair test spans many assets and fault types.`) : null,
+          !incidents.size && !assets.size ? h("li", null, "The labelled records aren't linked to incidents or assets, so how varied the test is can't be checked.")
+            : incidents.size < 5 ? h("li", null, `The questions cover ${incidents.size} incident${incidents.size === 1 ? "" : "s"}; a fair test spans many assets and fault types.`) : null,
           h("li", null, "Targets are working targets for this pilot, to be agreed with the plant.")))),
-      h("p", { class: "toolbar-note" }, `Run ${shortId(latest.run_id || "")} · top ${latest.k} · ${String(latest.embedding_model || "").replace(/\(.*\)$/, "")}${latest.persisted ? " · saved to run history" : " · kept in this browser only"}`)));
+      h("p", { class: "toolbar-note" }, `${latest.question_set ? `Question set ${latest.question_set.name} v${latest.question_set.version} (${latest.question_set.status.replace("_", " ")}${latest.question_set.reviewed_by ? `, reviewed by ${latest.question_set.reviewed_by}` : ""}) · ` : "Ad hoc questions, not a saved set · "}Run ${shortId(latest.run_id || "")} · top ${latest.k} · ${String(latest.embedding_model || "").replace(/\(.*\)$/, "")}${latest.persisted ? " · saved to run history" : " · kept in this browser only"}`)));
 }

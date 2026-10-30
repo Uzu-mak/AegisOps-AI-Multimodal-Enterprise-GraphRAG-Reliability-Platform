@@ -29,6 +29,10 @@ class MemoryCreateRequest(BaseModel):
     team_id: str | None = None
     access_roles: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] | None = None
+    # Write-side quality flags (stored at import, or computed on read for older records).
+    quality_flags: list[str] = Field(default_factory=list)
+    # Plain-language provenance: where the record came from and how far to rely on it.
+    trust: str = ""
 
 
 class MemoryUpdateRequest(BaseModel):

@@ -15,7 +15,10 @@ from app.evaluation import store
 @pytest.fixture
 def session_factory():
     engine = create_engine("sqlite://")
-    Base.metadata.create_all(engine, tables=[store.EvalRunRecord.__table__, store.EvalCaseResultRecord.__table__])
+    from app.evaluation import datasets
+
+    Base.metadata.create_all(engine, tables=[store.EvalRunRecord.__table__, store.EvalCaseResultRecord.__table__,
+                                             datasets.EvalQuestionSetRecord.__table__, datasets.EvalQuestionRecord.__table__])
     yield sessionmaker(engine)
     engine.dispose()
 

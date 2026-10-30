@@ -95,14 +95,22 @@ export function loadEvalState() {
   try {
     const raw = localStorage.getItem("aegis-eval-cases");
     const cases = raw ? JSON.parse(raw) : [];
-    return { cases: Array.isArray(cases) ? cases : [], pending: null, results: null };
+    let setRef = null;
+    try { setRef = JSON.parse(localStorage.getItem("aegis-eval-set") || "null"); } catch {}
+    return { cases: Array.isArray(cases) ? cases : [], pending: null, results: null, setRef };
   } catch {
-    return { cases: [], pending: null, results: null };
+    return { cases: [], pending: null, results: null, setRef: null };
   }
 }
 
-export function saveEvalCases() {
-  try { localStorage.setItem("aegis-eval-cases", JSON.stringify(evalState.cases)); } catch {}
+/** Save the working questions. Any edit detaches them from the question-set
+ *  version they were loaded from, unless that version is being loaded now. */
+export function saveEvalCases({ keepSet = false } = {}) {
+  if (!keepSet && evalState.setRef) evalState.setRef = { ...evalState.setRef, modified: true };
+  try {
+    localStorage.setItem("aegis-eval-cases", JSON.stringify(evalState.cases));
+    localStorage.setItem("aegis-eval-set", JSON.stringify(evalState.setRef));
+  } catch {}
 }
 
 /* ------------------------------------------------------- shared derivations */

@@ -7,6 +7,33 @@ import { navLink, refreshHealth } from "../lib/state.js";
 
 /* ------------------------------------------------------- record dialogs */
 
+// Read-only lineage (GET /memories/{id}/lineage): origin, versions, the
+// records a finding was derived from, findings that use this record, and the
+// last projection event per search index.
+async function loadLineage(id, host) {
+  const r = await api(`/memories/${id}/lineage`);
+  if (!r.ok) return put(host, notice("warn", "Lineage isn't available", r.error));
+  const L = r.data, o = L.origin || {};
+  const link = (b) => h("button", { class: "btn btn-quiet", type: "button", onclick: () => showMemory(b.id) }, b.title || `record ${shortId(b.id)}`);
+  const list = (rows, none) => rows.length ? h("ul", { class: "plain-list" }, rows.map((b) => h("li", null, link(b), b.status && b.status !== "active" ? ` (${b.status})` : ""))) : h("span", { class: "cell-sub" }, none);
+  const proj = (p, name) => !p ? `${name}: no projection event recorded`
+    : `${name}: ${p.status}${p.completed_at ? `, ${fmtWhen(p.completed_at)}` : ""}${p.error ? ` (${p.error})` : ""}`;
+  const origin = o.file_name
+    ? `Imported from ${o.file_name}${o.row ? `, row ${o.row}` : ""}${o.source_system ? ` (${o.source_system})` : ""} on ${fmtWhen(o.recorded_at)}`
+    : `Created as a ${String(o.source_type || "record").replace(/_/g, " ")} record on ${fmtWhen(o.recorded_at)}`;
+  put(host, h("dl", { class: "facts" },
+    h("dt", null, "Origin"), h("dd", null, origin, o.is_synthetic ? " · sample data" : ""),
+    o.fingerprint ? [h("dt", null, "Import fingerprint"), h("dd", null, h("code", null, o.fingerprint))] : null,
+    h("dt", null, "Revision"), h("dd", null, String(L.revision ?? 0)),
+    h("dt", null, "Earlier versions"), h("dd", null, list(L.earlier_versions || [], "None")),
+    h("dt", null, "Replaced by"), h("dd", null, list(L.later_versions || [], "Not replaced")),
+    (L.derived_from || []).length ? [h("dt", null, "Derived from"), h("dd", null, list(L.derived_from, ""))] : null,
+    h("dt", null, "Used by findings"), h("dd", null, list(L.used_by_findings || [], "No confirmed finding cites it")),
+    h("dt", null, "Search indexes"), h("dd", null, h("ul", { class: "plain-list" },
+      h("li", null, proj(L.projections?.qdrant, "Meaning search (Qdrant)")), h("li", null, proj(L.projections?.neo4j, "Relationships (Neo4j)")))),
+  ));
+}
+
 export async function showMemory(id, { onChange } = {}) {
   openDialog("Loading record", skeleton(), null, { drawer: true });
   const r = await api(`/memories/${id}`);
@@ -40,6 +67,15 @@ export async function showMemory(id, { onChange } = {}) {
     confirmArea.querySelector("[data-autofocus]").focus();
   };
 
+  // Write-side quality flags (app/ingestion/quality.py). "No asset" is shown in the facts instead.
+  const QUALITY_LABEL = { administrative: "Administrative entry", routine_check: "Routine check only", truncated: "Text cut off at source" };
+  const QUALITY_HINT = {
+    administrative: "Billing or paperwork entry with no technical content; not used as evidence of a cause or fix.",
+    routine_check: "Only records that a check passed; useful as an outcome, not as an explanation.",
+    truncated: "The source system cut this text off, so part of the original entry is missing.",
+  };
+  const lineageHost = h("details", { class: "lineage" }, h("summary", null, "Lineage: where this record came from and what uses it"), h("div", null, skeleton()));
+  lineageHost.addEventListener("toggle", () => { if (lineageHost.open && !lineageHost.dataset.loaded) { lineageHost.dataset.loaded = "1"; loadLineage(m.id, lineageHost.lastChild); } }, { once: false });
   const evidenceOf = m.metadata?.evidence_memory_ids || [];
   const wo = m.source_type === "work_order" ? (m.metadata?.work_order || {}) : null;
   const codes = wo ? [["Problem", wo.problem], ["Cause", wo.cause], ["Remedy", wo.remedy]].filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(", ") : null;
@@ -47,7 +83,8 @@ export async function showMemory(id, { onChange } = {}) {
     h("div", { class: "evidence-head" }, lifecycleChip(m.status), h("span", { class: "tag" }, typeLabel(m.memory_type)),
       m.source_type === "investigation" ? stateChip("Confirmed finding", "normal") : null,
       wo ? h("span", { class: "tag" }, "Imported work order") : null,
-      m.is_synthetic ? h("span", { class: "tag" }, "Sample data") : null),
+      m.is_synthetic ? h("span", { class: "tag" }, "Sample data") : null,
+      ...(m.quality_flags || []).filter((f) => QUALITY_LABEL[f]).map((f) => h("span", { class: "tag tag-trust is-caution", title: QUALITY_HINT[f] }, QUALITY_LABEL[f]))),
     h("p", { class: "record-body" }, m.content),
     h("dl", { class: "facts" },
       ...[
@@ -56,6 +93,7 @@ export async function showMemory(id, { onChange } = {}) {
         ["Line or component", m.component_id],
         ["Incident", m.incident_id ? navLink(m.incident_id, "incidents", { id: m.incident_id }) : null],
         ["Source", wo ? `Work order ${m.source_id}` : m.source_type],
+        ["Trust", m.trust || null],
         ["Work type", wo ? [wo.work_type, wo.work_type_class && wo.work_type_class !== "unknown" ? `(${wo.work_type_class})` : null].filter(Boolean).join(" ") : null],
         ["CMMS status", wo?.status],
         ["Failure codes", codes],
@@ -70,6 +108,7 @@ export async function showMemory(id, { onChange } = {}) {
         ["Record ID", h("code", null, m.id)],
       ].filter(([, v]) => v !== null && v !== undefined && v !== "" && v !== "—").map(([k, v]) => [h("dt", null, k), h("dd", null, v)]),
     ),
+    lineageHost,
     confirmArea,
   );
 

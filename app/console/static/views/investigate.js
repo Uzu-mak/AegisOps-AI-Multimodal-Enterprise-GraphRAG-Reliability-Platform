@@ -9,6 +9,17 @@ import { isAdmin } from "../lib/session.js";
 
 /* ------------------------------------------------------- investigate */
 
+// What the search covered. Absence of a record is only evidence of absence
+// within these records, so the answer always says what they were.
+function searchedLine(sc) {
+  if (!sc || !sc.active_records) return null;
+  const parts = Object.entries(sc.by_source || {}).sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${num(n)} ${k === "work_order" ? "work orders" : k === "investigation" ? "confirmed findings" : `${k.replace(/_/g, " ")} records`}`);
+  return h("p", { class: "check-line" },
+    `Searched ${num(sc.active_records)} active records (${parts.join(", ")}${sc.sample_records ? `; ${num(sc.sample_records)} are sample data` : ""}). ` +
+    "If something isn't found here, it may still have happened: it may simply not be in these records.");
+}
+
 export async function viewInvestigate(params) {
   const anchor = params.get("anchor") || "";
   const q = params.get("q") || "";
@@ -183,6 +194,12 @@ export function renderInvestigation(d, anchor) {
         : `Needs review: ${critic.notes || "the citation check did not pass"}`),
       !critic.is_supported && critic.unsupported_claims?.length
         ? h("ul", { class: "unsupported" }, critic.unsupported_claims.map((c) => h("li", null, `No citation: “${c}”`)))
+        : null,
+      searchedLine(d.searched),
+      critic.weak_citations?.length
+        ? h("div", null,
+          h("p", { class: "check-line" }, "Check these: the cited record shares few words with the sentence, so it may not support it."),
+          h("ul", { class: "unsupported" }, critic.weak_citations.map((c) => h("li", null, `Weak citation: “${c}”`))))
         : null));
 
   /* Evidence, as cards with their role and provenance. */
@@ -195,6 +212,7 @@ export function renderInvestigation(d, anchor) {
         const tags = h("div", { class: "queue-meta" },
           h("span", { class: "tag" }, typeLabel(e.memory_type)),
           metaPair("Asset", e.asset_id), metaPair("Confidence", pct(e.confidence)),
+          e.trust ? h("span", { class: `tag tag-trust${/sample|cut off|administrative|disputed|superseded/.test(e.trust) ? " is-caution" : ""}`, title: "Where this record came from" }, e.trust) : null,
           admin ? h("span", { class: "tag" }, SOURCE_LABEL[e.retrieval_source] || e.retrieval_source) : null);
         tagHosts.set(e.memory_id, tags);
         return h("li", { id: `ev-${n}`, tabindex: "-1", class: "prov" },

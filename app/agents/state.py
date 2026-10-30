@@ -63,6 +63,9 @@ class CriticResult:
     citations_valid: bool = True
     confidence: float = 1.0
     notes: str = ""
+    # Sentences whose cited records share almost no words with them: the
+    # citation exists but may not support the claim. A lexical check, not proof.
+    weak_citations: list[str] = field(default_factory=list)
 
 
 @dataclass

@@ -19,6 +19,8 @@ from app.agents.workflow import AegisOpsWorkflow
 from app.api.deps import get_hybrid_retriever, get_llm_provider, get_memory_service
 from app.api.routes.memories import memory_to_response
 from app.api.schemas.memory import MemoryResponse
+from app.core.security import current_principal
+from app.db.session import SessionLocal
 from app.graphrag.pipeline import GraphRAGPipeline
 from app.graphrag.provider import LLMProvider
 from app.memory.candidate import MemoryCandidate
@@ -27,6 +29,7 @@ from app.observability.metrics import metrics_collector
 from app.retrieval.hybrid import HybridMemoryRetriever
 from app.services.exceptions import MemoryNotFoundError
 from app.services.memory_service import MemoryService
+from app.services.search_scope import search_scope
 
 router = APIRouter(prefix="/api/v1", tags=["investigations"])
 
@@ -92,6 +95,8 @@ def run_investigation(
         "is_synthetic_response": rag.is_synthetic_response,
         "retrieval_mode": rag.retrieval_mode,
         "evidence_count": len(rag.evidence),
+        # What was searchable: absence of a record is only evidence of absence here.
+        "searched": search_scope(SessionLocal, getattr(current_principal(), "tenant_id", None)),
         "evidence": [
             {
                 "memory_id": e.memory_id,
@@ -99,6 +104,7 @@ def run_investigation(
                 "title": e.title,
                 "content_preview": e.content[:300],
                 "retrieval_source": e.retrieval_source,
+                "trust": e.trust,
                 "semantic_score": e.semantic_score,
                 "asset_id": e.asset_id,
                 "facility_id": e.facility_id,
@@ -122,6 +128,7 @@ def run_investigation(
             "confidence": critic.confidence,
             "notes": critic.notes,
             "unsupported_claims": critic.unsupported_claims,
+            "weak_citations": critic.weak_citations,
         } if critic else None,
         "retrieval_latency_ms": rag.retrieval_latency_ms,
         "generation_latency_ms": rag.generation_latency_ms,

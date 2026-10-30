@@ -32,7 +32,7 @@ def _parse_evidence_blocks(system_msg: str) -> list[dict[str, str]]:
                 block["title"] = line[7:].strip()
             elif line.startswith("Content: "):
                 block["content"] = line[9:].strip()
-            elif line.startswith("--- END"):
+            elif line.startswith("--- END") or line.startswith("</evidence>"):
                 break
         blocks.append(block)
     return blocks
@@ -64,7 +64,10 @@ class DeterministicTestProvider(LLMProvider):
         # Count evidence items mentioned in context
         # Extractive and deterministic: list the evidence blocks the context
         # actually contains, each with its citation. No reasoning is added.
-        blocks = _parse_evidence_blocks(system_msg)
+        # Evidence now travels in the user message; older contexts put it in the system prompt.
+        blocks = _parse_evidence_blocks(user_msg) or _parse_evidence_blocks(system_msg)
+        question = re.match(r"Question: (.*)", user_msg)
+        user_msg = question.group(1) if question else user_msg
         lines = [
             "[SYNTHETIC RESPONSE — deterministic-test-v1]",
             "",
