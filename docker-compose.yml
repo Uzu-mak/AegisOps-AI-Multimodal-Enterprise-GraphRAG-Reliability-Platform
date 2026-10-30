@@ -94,6 +94,15 @@ services:
     depends_on:
       migrate: {condition: service_completed_successfully}
     restart: unless-stopped
+  keycloak-data-init:
+    # A new named volume is owned by root, but Keycloak runs as user 1000 and
+    # must write its database there. Hand the volume to that user once.
+    # (Reuses the already-pulled postgres image; nothing else is downloaded.)
+    profiles: [auth]
+    image: postgres:16-alpine
+    entrypoint: ["sh", "-c", "chown -R 1000:0 /kc && chmod -R ug+rwX /kc"]
+    volumes: ["aegisops_keycloak_data:/kc"]
+    restart: "no"
   keycloak:
     # Sign-in provider for AUTH_MODE=oidc. Started with the "auth" profile
     # (COMPOSE_PROFILES=auth in .env). The realm, roles, console client and
@@ -102,6 +111,8 @@ services:
     image: quay.io/keycloak/keycloak:26.0.7
     container_name: aegisops-keycloak
     command: ["start-dev", "--import-realm"]
+    depends_on:
+      keycloak-data-init: {condition: service_completed_successfully}
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change_me_keycloak}
